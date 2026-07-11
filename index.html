@@ -15,8 +15,6 @@
 html,body{margin:0;padding:0;}
 body{background:#eef1f3;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;color:#1b2227;-webkit-font-smoothing:antialiased;}
 input,button,textarea{font-family:inherit;}
-@keyframes fk-spin{to{transform:rotate(360deg);}}
-.spinner{width:30px;height:30px;border:3px solid #d8e1e6;border-top-color:#2f6076;border-radius:50%;animation:fk-spin .8s linear infinite;}
 .noprint{}
 .printonly{display:none;}
 @media print{
@@ -39,15 +37,8 @@ input,button,textarea{font-family:inherit;}
 .seg-btn{font:inherit;font-size:11px;padding:6px 9px;border-radius:999px;border:1px solid #c2ccd2;cursor:pointer;white-space:nowrap;line-height:1;}
 .seg-btn.on{background:#2f6076;color:#fff;border-color:#2f6076;}
 .seg-btn.off{background:#fff;color:#5c6b73;}
-.tab-btn{flex:1;font:inherit;font-size:13px;font-weight:600;padding:9px;border-radius:7px;border:none;cursor:pointer;}
-.tab-btn.on{background:#fff;color:#16242c;box-shadow:0 1px 2px rgba(20,40,60,.12);}
-.tab-btn.off{background:transparent;color:#7c8a91;}
 .tbtn{background:#fff;color:#3b4a52;border:1px solid #c7d0d6;border-radius:8px;padding:11px 14px;font-size:13px;font-weight:600;cursor:pointer;}
 .tbtn:hover{background:#f4f7f8;}
-.modal-bg{position:fixed;inset:0;background:rgba(18,30,38,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:50;}
-.modal{background:#fff;border-radius:14px;width:520px;max-width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(10,25,35,.4);}
-.upload-zone{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:2px dashed #c2cdd3;border-radius:12px;padding:38px 20px;text-align:center;cursor:pointer;background:#fafcfd;}
-.upload-zone:hover{border-color:#2f6076;background:#f3f8fa;}
 .btn-del{background:transparent;border:none;color:#b9c2c8;font-size:16px;cursor:pointer;padding:8px 4px;border-radius:5px;line-height:1;}
 .btn-del:hover{background:#fbeceb;color:#c0392b;}
 </style>
@@ -65,9 +56,6 @@ input,button,textarea{font-family:inherit;}
 
     <!-- Toolbar -->
     <div class="noprint" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:16px 26px;border-bottom:1px solid #e7ecef;">
-      <button onclick="openScan()" style="display:inline-flex;align-items:center;gap:9px;background:#2f6076;color:#fff;border:none;border-radius:8px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 1px 2px rgba(20,40,60,.15);">
-        <span style="font-size:17px;line-height:1;">&#8853;</span> Skann reagens (bilde)
-      </button>
       <button class="tbtn" style="color:#2f6076;border-color:#b9c7cf;" onclick="addEmptyRow()">+ Legg til tom rad</button>
       <div style="width:1px;align-self:stretch;background:#e3e9ec;margin:2px 0;"></div>
       <div id="sb-bar" style="display:none;align-items:center;gap:8px;">
@@ -89,8 +77,6 @@ input,button,textarea{font-family:inherit;}
       <div id="stats" style="display:flex;gap:14px;align-items:center;font-size:12.5px;color:#5c6b73;margin-right:4px;"></div>
       <button class="tbtn" onclick="exportCsv()">Eksporter CSV</button>
       <button class="tbtn" onclick="window.print()">Skriv ut / PDF</button>
-      <button id="apibtn" class="tbtn" onclick="openApiKey()" style="color:#7c8a91;">&#9881; API-n&#248;kkel</button>
-      <button id="sbbtn" class="tbtn" onclick="openSbModal()" style="color:#7c8a91;">&#9728; Supabase</button>
     </div>
 
     <!-- Print meta -->
@@ -124,123 +110,11 @@ input,button,textarea{font-family:inherit;}
   </div>
 </div>
 
-<!-- Scan modal -->
-<div id="scan-modal" class="modal-bg noprint" style="display:none;" onclick="if(event.target===this)closeScan()">
-  <div class="modal">
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid #eceff1;">
-      <div>
-        <div style="font-size:16px;font-weight:700;color:#16242c;">Skann reagens</div>
-        <div style="font-size:12.5px;color:#7c8a91;margin-top:2px;">Navn, lot og utl&#248;psdato leses av automatisk</div>
-      </div>
-      <button onclick="closeScan()" style="background:#f1f4f6;border:none;width:32px;height:32px;border-radius:8px;font-size:16px;color:#52636b;cursor:pointer;">&#10005;</button>
-    </div>
-    <div style="padding:20px 22px;">
-      <div id="nokey-warn" style="display:none;background:#fdf6e6;border:1px solid #f0d888;border-radius:10px;padding:14px 16px;margin-bottom:16px;">
-        <div style="font-size:13px;font-weight:700;color:#7a5800;margin-bottom:4px;">API-n&#248;kkel ikke konfigurert</div>
-        <div style="font-size:12.5px;color:#8a6300;margin-bottom:10px;">For automatisk avlesning trengs en Anthropic API-n&#248;kkel. Lukk og trykk &#171;&#9881; API-n&#248;kkel&#187; i verkt&#248;ylinjen.</div>
-        <button onclick="closeScan();openApiKey();" style="background:#2f6076;color:#fff;border:none;border-radius:7px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">&#197;pne innstillinger</button>
-      </div>
-      <div id="scan-tabs" style="display:flex;gap:6px;background:#f1f4f6;padding:4px;border-radius:9px;margin-bottom:18px;">
-        <button id="tab-up" class="tab-btn on" onclick="setTab('upload')">Last opp bilde</button>
-        <button id="tab-cam" class="tab-btn off" onclick="setTab('camera')">Ta bilde (kamera)</button>
-      </div>
-      <div id="scan-upload">
-        <label class="upload-zone" ondragover="event.preventDefault()" ondrop="onDrop(event)">
-          <div style="font-size:34px;opacity:.5;">&#8679;</div>
-          <div style="font-size:14px;font-weight:600;color:#3b4a52;">Dra bildet hit, eller klikk for &#229; velge</div>
-          <div style="font-size:12px;color:#8a979e;">Foto av reagensetiketten (JPG/PNG)</div>
-          <input type="file" accept="image/*" onchange="onFile(event)" style="display:none;">
-        </label>
-      </div>
-      <div id="scan-camera" style="display:none;">
-        <div style="position:relative;border-radius:12px;overflow:hidden;background:#0d1418;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;">
-          <video id="scanvideo" playsinline muted style="width:100%;height:100%;object-fit:cover;"></video>
-          <button id="startcam" onclick="startCamera()" style="position:absolute;background:#fff;color:#16242c;border:none;border-radius:8px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer;">Start kamera</button>
-        </div>
-        <button id="capturebtn" onclick="capturePhoto()" style="display:none;width:100%;margin-top:12px;background:#2f6076;color:#fff;border:none;border-radius:9px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;">Ta bilde</button>
-      </div>
-      <div id="scan-preview" style="display:none;">
-        <img id="previewimg" src="" alt="forh&#229;ndsvisning" style="width:100%;border-radius:12px;border:1px solid #e3e8eb;max-height:300px;object-fit:contain;background:#f6f8f9;">
-        <div id="scan-err" style="display:none;margin-top:12px;background:#fbeceb;color:#a5342a;border-radius:8px;padding:10px 12px;font-size:13px;"></div>
-        <div style="display:flex;gap:10px;margin-top:14px;">
-          <button onclick="retake()" style="flex:0 0 auto;background:#fff;color:#3b4a52;border:1px solid #c7d0d6;border-radius:9px;padding:12px 16px;font-size:14px;font-weight:600;cursor:pointer;">Ta nytt</button>
-          <button onclick="runOCR()" style="flex:1;background:#2f6076;color:#fff;border:none;border-radius:9px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;">Les av med AI</button>
-        </div>
-      </div>
-      <div id="scan-spin" style="display:none;flex-direction:column;align-items:center;gap:12px;padding:26px 0 6px;">
-        <div class="spinner"></div>
-        <div style="font-size:13.5px;color:#52636b;font-weight:600;">Leser av etiketten &#8230;</div>
-      </div>
-      <div id="scan-err2" style="display:none;margin-top:14px;background:#fdf6e6;color:#8a6300;border-radius:8px;padding:10px 12px;font-size:13px;"></div>
-    </div>
-  </div>
-</div>
-
-<!-- API key modal -->
-<div id="key-modal" class="modal-bg noprint" style="display:none;" onclick="if(event.target===this)closeApiKey()">
-  <div class="modal" style="width:460px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid #eceff1;">
-      <div style="font-size:16px;font-weight:700;color:#16242c;">API-n&#248;kkel for bildeavlesning</div>
-      <button onclick="closeApiKey()" style="background:#f1f4f6;border:none;width:32px;height:32px;border-radius:8px;font-size:16px;color:#52636b;cursor:pointer;">&#10005;</button>
-    </div>
-    <div style="padding:20px 22px;">
-      <div style="font-size:13px;color:#5c6b73;margin-bottom:14px;line-height:1.55;">Legg inn en Anthropic API-n&#248;kkel for &#229; aktivere automatisk avlesning av reagensetiketter. N&#248;kkelen lagres lokalt i nettleseren og sendes til Anthropic ved skanning.</div>
-      <label style="display:block;font-size:11px;font-weight:700;color:#3b4a52;margin-bottom:6px;letter-spacing:.06em;text-transform:uppercase;">Anthropic API-n&#248;kkel</label>
-      <input id="keyinput" type="password" placeholder="sk-ant-..." style="width:100%;border:1px solid #c7d0d6;border-radius:8px;padding:10px 12px;font-size:13px;font-family:ui-monospace,monospace;color:#1b2227;outline:none;" onfocus="this.style.borderColor='#2f6076'" onblur="this.style.borderColor='#c7d0d6'">
-      <div id="key-stored" style="display:none;margin-top:8px;font-size:12px;color:#3a8a5f;align-items:center;gap:5px;">
-        <span style="width:7px;height:7px;border-radius:50%;background:#3a8a5f;display:inline-block;"></span> N&#248;kkel lagret i nettleseren
-      </div>
-      <div style="display:flex;gap:8px;margin-top:16px;align-items:center;">
-        <button onclick="clearApiKey()" style="background:#fff;color:#b0392b;border:1px solid #e8c0bc;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;">Fjern n&#248;kkel</button>
-        <div style="flex:1;"></div>
-        <button onclick="closeApiKey()" class="tbtn">Avbryt</button>
-        <button onclick="saveApiKey()" style="background:#2f6076;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;">Lagre</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Supabase modal -->
-<div id="sb-modal" class="modal-bg noprint" style="display:none;" onclick="if(event.target===this)closeSbModal()">
-  <div class="modal" style="width:500px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid #eceff1;">
-      <div style="font-size:16px;font-weight:700;color:#16242c;">Supabase &#8211; delt database</div>
-      <button onclick="closeSbModal()" style="background:#f1f4f6;border:none;width:32px;height:32px;border-radius:8px;font-size:16px;color:#52636b;cursor:pointer;">&#10005;</button>
-    </div>
-    <div style="padding:20px 22px;">
-      <div style="font-size:13px;color:#5c6b73;margin-bottom:16px;line-height:1.6;">
-        Alle som installerer appen kan dele den samme listen i sanntid. Opprett et gratis prosjekt p&#229; <strong>supabase.com</strong>, kj&#248;r SQL-en under, og lim inn URL og n&#248;kkel.
-      </div>
-      <details style="margin-bottom:16px;">
-        <summary style="font-size:12px;font-weight:700;color:#3b4a52;cursor:pointer;letter-spacing:.05em;text-transform:uppercase;padding:8px 0;">Vis SQL &#8211; kj&#248;r i Supabase SQL Editor</summary>
-        <pre id="sb-sql" style="margin:10px 0 0;background:#f3f6f8;border:1px solid #dbe1e6;border-radius:8px;padding:14px;font-size:11.5px;font-family:ui-monospace,monospace;white-space:pre-wrap;color:#1b2227;line-height:1.5;"></pre>
-        <button onclick="copySql()" style="margin-top:8px;background:#fff;border:1px solid #c7d0d6;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;color:#3b4a52;">&#128203; Kopier SQL</button>
-      </details>
-      <label style="display:block;font-size:11px;font-weight:700;color:#3b4a52;margin-bottom:6px;letter-spacing:.06em;text-transform:uppercase;">Supabase Project URL</label>
-      <input id="sb-url-input" type="text" placeholder="https://xxxxxxxxxxxx.supabase.co" style="width:100%;border:1px solid #c7d0d6;border-radius:8px;padding:10px 12px;font-size:13px;font-family:ui-monospace,monospace;color:#1b2227;outline:none;margin-bottom:14px;" onfocus="this.style.borderColor='#2f6076'" onblur="this.style.borderColor='#c7d0d6'">
-      <label style="display:block;font-size:11px;font-weight:700;color:#3b4a52;margin-bottom:6px;letter-spacing:.06em;text-transform:uppercase;">Anon Public Key</label>
-      <input id="sb-key-input" type="password" placeholder="eyJ..." style="width:100%;border:1px solid #c7d0d6;border-radius:8px;padding:10px 12px;font-size:13px;font-family:ui-monospace,monospace;color:#1b2227;outline:none;" onfocus="this.style.borderColor='#2f6076'" onblur="this.style.borderColor='#c7d0d6'">
-      <div id="sb-test-result" style="display:none;margin-top:10px;border-radius:8px;padding:10px 12px;font-size:13px;"></div>
-      <div style="display:flex;gap:8px;margin-top:16px;align-items:center;">
-        <button onclick="clearSb()" style="background:#fff;color:#b0392b;border:1px solid #e8c0bc;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;">Fjern</button>
-        <button onclick="testSb()" class="tbtn" style="font-size:13px;">Test tilkobling</button>
-        <div style="flex:1;"></div>
-        <button onclick="closeSbModal()" class="tbtn">Avbryt</button>
-        <button onclick="saveSb()" style="background:#2f6076;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;">Lagre og koble til</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <script>
 var SKEY = 'fargekit_rows_v1';
-var AKEY = 'fk_anthropic_key';
 var rows = [];
 var fileName = '';
 var fileHandle = null;
-var scanTab = 'upload';
-var captured = null;
-var camStream = null;
 var hlTimer = null;
 
 function today() { return new Date().toISOString().slice(0,10); }
@@ -248,7 +122,7 @@ function genId() { return Date.now()+'-'+Math.random().toString(36).slice(2,7); 
 function h(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 function emptyRow(x) {
-  return Object.assign({id:genId(),navn:'',storage:'kjol',ventana:'',lot:'',exp:'',mDato:'',mSign:'',tDato:'',tSign:'',komm:'',_new:false},x||{});
+  return Object.assign({id:genId(),parentId:null,navn:'',storage:'kjol',ventana:'',lot:'',exp:'',mDato:'',mSign:'',tDato:'',tSign:'',komm:'',_new:false},x||{});
 }
 function persist() {
   try{localStorage.setItem(SKEY,JSON.stringify(rows.map(function(r){var c=Object.assign({},r);delete c._new;return c;})));}catch(e){}
@@ -270,16 +144,27 @@ function rowBg(row,i) {
 function renderTable() {
   var tbody=document.getElementById('tbody');
   var empty=document.getElementById('empty');
-  if(!rows.length){tbody.innerHTML='';empty.style.display='block';}
-  else{empty.style.display='none';tbody.innerHTML=rows.map(rowHtml).join('');}
+  var top=rows.filter(function(r){return !r.parentId;});
+  if(!top.length){tbody.innerHTML='';empty.style.display='block';}
+  else{
+    empty.style.display='none';
+    var html='';
+    top.forEach(function(r,i){
+      var ch=rows.filter(function(c){return c.parentId===r.id;});
+      html+=rowHtml(r,i,ch.length);
+      ch.forEach(function(c,ci){html+=subRowHtml(c,ci);});
+    });
+    tbody.innerHTML=html;
+  }
   renderStats();
 }
-function rowHtml(row,i) {
-  var st=expSt(row.exp),bg=rowBg(row,i);
+function rowHtml(row,i,childCount) {
+  var st=expSt(row.exp),bg=rowBg(row,i),ch=childCount||0;
   return '<tr data-id="'+h(row.id)+'" style="background:'+bg+';transition:background .3s;">'
     +'<td style="padding:9px 8px;border-bottom:1px solid #eef2f4;vertical-align:top;">'
-      +'<div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding-top:6px;">'
+      +'<div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:6px;">'
         +'<span style="font-size:12px;color:#8a979e;font-weight:600;">'+(i+1)+'</span>'
+        +(ch?'<span style="font-size:10px;color:#2f6076;background:#e3eef3;border-radius:4px;padding:1px 5px;font-weight:700;white-space:nowrap;">'+ch+' &#9727;</span>':'')
         +'<span class="dot" title="'+h(st.label)+'" style="width:9px;height:9px;border-radius:50%;display:inline-block;background:'+st.dot+';"></span>'
       +'</div>'
     +'</td>'
@@ -318,7 +203,48 @@ function rowHtml(row,i) {
       +'<input class="cell-input" type="text" data-f="komm" value="'+h(row.komm)+'">'
     +'</td>'
     +'<td class="noprint" style="padding:5px 4px;border-bottom:1px solid #eef2f4;vertical-align:top;text-align:center;">'
-      +'<button class="btn-del" data-del="1" title="Slett rad">✕</button>'
+      +'<div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:3px;">'
+        +'<button class="btn-del" data-del="1" title="Slett rad">&#10005;</button>'
+        +'<button data-addchild="'+h(row.id)+'" title="Legg til underrad (glass)" style="background:transparent;border:1px solid #b4c7d1;color:#2f6076;font-size:14px;font-weight:700;cursor:pointer;padding:1px 7px;border-radius:5px;line-height:1.5;">+</button>'
+      +'</div>'
+    +'</td>'
+    +'</tr>';
+}
+function subRowHtml(row,ci) {
+  var st=expSt(row.exp);
+  var bg=row._new?'#e7f4ec':(expSt(row.exp).tint||'#f2f8fb');
+  return '<tr data-id="'+h(row.id)+'" data-child="1" style="background:'+bg+';transition:background .3s;">'
+    +'<td style="padding:9px 8px;border-bottom:1px solid #e8f0f4;vertical-align:top;">'
+      +'<div style="display:flex;flex-direction:column;align-items:center;gap:3px;padding-top:5px;">'
+        +'<span style="color:#85afc0;font-size:14px;line-height:1;">&#8627;</span>'
+        +'<span style="font-size:11px;color:#85afc0;font-weight:600;">'+(ci+1)+'</span>'
+        +'<span class="dot" title="'+h(st.label)+'" style="width:8px;height:8px;border-radius:50%;display:inline-block;background:'+st.dot+';"></span>'
+      +'</div>'
+    +'</td>'
+    +'<td colspan="3" style="padding:5px 6px;border-bottom:1px solid #e8f0f4;border-left:3px solid #aacfde;background:#eaf4f8;"></td>'
+    +'<td style="padding:5px 6px;border-bottom:1px solid #e8f0f4;vertical-align:top;">'
+      +'<input class="cell-input" type="text" data-f="lot" value="'+h(row.lot)+'" style="font-variant-numeric:tabular-nums;">'
+    +'</td>'
+    +'<td style="padding:5px 6px;border-bottom:1px solid #e8f0f4;vertical-align:top;">'
+      +'<input class="date-input" type="date" data-f="exp" value="'+h(row.exp)+'">'
+    +'</td>'
+    +'<td style="padding:5px 6px;border-bottom:1px solid #e8f0f4;vertical-align:top;">'
+      +'<div style="display:flex;flex-direction:column;gap:4px;">'
+        +'<input class="date-input" type="date" data-f="mDato" value="'+h(row.mDato)+'">'
+        +'<input class="sign-input" type="text" data-f="mSign" value="'+h(row.mSign)+'" placeholder="sign.">'
+      +'</div>'
+    +'</td>'
+    +'<td style="padding:5px 6px;border-bottom:1px solid #e8f0f4;vertical-align:top;">'
+      +'<div style="display:flex;flex-direction:column;gap:4px;">'
+        +'<input class="date-input" type="date" data-f="tDato" value="'+h(row.tDato)+'">'
+        +'<input class="sign-input" type="text" data-f="tSign" value="'+h(row.tSign)+'" placeholder="sign.">'
+      +'</div>'
+    +'</td>'
+    +'<td style="padding:5px 6px;border-bottom:1px solid #e8f0f4;vertical-align:top;">'
+      +'<input class="cell-input" type="text" data-f="komm" value="'+h(row.komm)+'">'
+    +'</td>'
+    +'<td class="noprint" style="padding:5px 4px;border-bottom:1px solid #e8f0f4;vertical-align:top;text-align:center;padding-top:9px;">'
+      +'<button class="btn-del" data-del="1" title="Slett underrad">&#10005;</button>'
     +'</td>'
     +'</tr>';
 }
@@ -351,20 +277,26 @@ document.getElementById('tbody').addEventListener('click',function(e){
   if(!tr)return;
   var row=rows.find(function(r){return r.id===tr.dataset.id;});
   if(!row)return;
-  if(e.target.dataset.s){
+  if(e.target.dataset.addchild){
+    addSubRow(e.target.dataset.addchild);
+  } else if(e.target.dataset.s){
     row.storage=e.target.dataset.s;
     persist();debounceSbUpsert(row);
     tr.querySelectorAll('[data-s]').forEach(function(b){b.className='seg-btn '+(b.dataset.s===row.storage?'on':'off');});
     var pt=tr.querySelector('.printonly');
-    if(pt)pt.textContent=row.storage==='kjol'?'Kjøleskap':'Romtemperatur';
+    if(pt)pt.textContent=row.storage==='kjol'?'Kj\xf8leskap':'Romtemperatur';
   } else if(e.target.dataset.del){
-    rows=rows.filter(function(r){return r.id!==row.id;});
-    persist();sbDelete(row.id);
-    renderTable();
+    var children=rows.filter(function(c){return c.parentId===row.id;});
+    if(children.length&&!confirm('Slett denne raden og '+children.length+' underrad'+(children.length>1?'er':'')+'?'))return;
+    var toDelete=[row.id].concat(children.map(function(c){return c.id;}));
+    toDelete.forEach(function(did){sbDelete(did);});
+    rows=rows.filter(function(r){return toDelete.indexOf(r.id)<0;});
+    persist();renderTable();
   }
 });
 
 function addEmptyRow(){addRow({},false);}
+function addSubRow(parentId){addRow({parentId:parentId,mDato:today()},true);}
 function addRow(extra,highlight){
   var row=emptyRow(Object.assign({_new:!!highlight},extra||{}));
   rows.push(row);
@@ -375,142 +307,12 @@ function addRow(extra,highlight){
     hlTimer=setTimeout(function(){
       row._new=false;
       var tr=document.querySelector('tr[data-id="'+row.id+'"]');
-      if(tr)tr.style.background=rowBg(row,rows.indexOf(row));
+      if(tr){
+        if(row.parentId){tr.style.background=expSt(row.exp).tint||'#f2f8fb';}
+        else{tr.style.background=rowBg(row,rows.filter(function(r){return !r.parentId;}).indexOf(row));}
+      }
     },3500);
   }
-}
-
-// API key
-function openApiKey(){
-  var k=localStorage.getItem(AKEY)||'';
-  document.getElementById('keyinput').value=k;
-  document.getElementById('key-stored').style.display=k?'flex':'none';
-  document.getElementById('key-modal').style.display='flex';
-}
-function closeApiKey(){document.getElementById('key-modal').style.display='none';}
-function saveApiKey(){
-  var k=document.getElementById('keyinput').value.trim();
-  if(k)localStorage.setItem(AKEY,k);else localStorage.removeItem(AKEY);
-  updateApiBtn();closeApiKey();
-}
-function clearApiKey(){
-  localStorage.removeItem(AKEY);
-  document.getElementById('keyinput').value='';
-  document.getElementById('key-stored').style.display='none';
-  updateApiBtn();
-}
-function updateApiBtn(){
-  var has=!!localStorage.getItem(AKEY),btn=document.getElementById('apibtn');
-  btn.style.color=has?'#2a7a52':'#7c8a91';
-  btn.style.borderColor=has?'#b0dac0':'#c7d0d6';
-}
-
-// Scan modal
-function openScan(){
-  captured=null;
-  document.getElementById('nokey-warn').style.display=localStorage.getItem(AKEY)?'none':'block';
-  document.getElementById('scan-modal').style.display='flex';
-  setTab('upload');
-  phase('tabs');
-}
-function closeScan(){stopCam();document.getElementById('scan-modal').style.display='none';captured=null;}
-function setTab(t){
-  scanTab=t;
-  document.getElementById('tab-up').className='tab-btn '+(t==='upload'?'on':'off');
-  document.getElementById('tab-cam').className='tab-btn '+(t==='camera'?'on':'off');
-  document.getElementById('scan-upload').style.display=t==='upload'?'block':'none';
-  document.getElementById('scan-camera').style.display=t==='camera'?'block':'none';
-  if(t==='upload')stopCam();
-}
-function phase(p){
-  document.getElementById('scan-tabs').style.display=p==='tabs'?'flex':'none';
-  document.getElementById('scan-upload').style.display=(p==='tabs'&&scanTab==='upload')?'block':'none';
-  document.getElementById('scan-camera').style.display=(p==='tabs'&&scanTab==='camera')?'block':'none';
-  document.getElementById('scan-preview').style.display=p==='preview'?'block':'none';
-  document.getElementById('scan-spin').style.display=p==='spinning'?'flex':'none';
-  document.getElementById('scan-err').style.display='none';
-  document.getElementById('scan-err2').style.display='none';
-}
-async function startCamera(){
-  try{
-    camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
-    var v=document.getElementById('scanvideo');
-    v.srcObject=camStream;try{await v.play();}catch(e){}
-    document.getElementById('startcam').style.display='none';
-    document.getElementById('capturebtn').style.display='block';
-  }catch(e){
-    document.getElementById('scan-err2').textContent='Kamera er ikke tilgjengelig. Bruk «Last opp bilde» i stedet.';
-    document.getElementById('scan-err2').style.display='block';
-  }
-}
-function stopCam(){
-  if(camStream){camStream.getTracks().forEach(function(t){t.stop();});camStream=null;}
-  var v=document.getElementById('scanvideo');if(v)v.srcObject=null;
-  var s=document.getElementById('startcam'),c=document.getElementById('capturebtn');
-  if(s)s.style.display='block';if(c)c.style.display='none';
-}
-function capturePhoto(){
-  var v=document.getElementById('scanvideo'),c=document.createElement('canvas');
-  c.width=v.videoWidth||1024;c.height=v.videoHeight||768;
-  c.getContext('2d').drawImage(v,0,0,c.width,c.height);
-  captured=c.toDataURL('image/jpeg',0.85);stopCam();showPreview();
-}
-function onFile(e){var f=e.target.files&&e.target.files[0];e.target.value='';readBlob(f);}
-function onDrop(e){e.preventDefault();readBlob(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]);}
-function readBlob(f){
-  if(!f||!/^image\//.test(f.type)){showErr2('Velg en bildefil.');return;}
-  var fr=new FileReader();
-  fr.onload=function(){captured=fr.result;showPreview();};
-  fr.readAsDataURL(f);
-}
-function showPreview(){document.getElementById('previewimg').src=captured;phase('preview');}
-function retake(){captured=null;phase('tabs');setTab(scanTab);}
-function showErr2(m){document.getElementById('scan-err2').textContent=m;document.getElementById('scan-err2').style.display='block';}
-
-async function runOCR(){
-  if(!captured)return;
-  var apiKey=localStorage.getItem(AKEY);
-  if(!apiKey){
-    document.getElementById('scan-err').textContent='API-nøkkel mangler. Trykk ✕ og bruk «⚙ API-nøkkel» i verktøylinjen.';
-    document.getElementById('scan-err').style.display='block';return;
-  }
-  phase('spinning');
-  var prompt='Du ser et foto av en etikett på et histologi-/patologireagens (ofte Ventana/Roche). '
-    +'Les av feltene og svar KUN med gyldig JSON, ingen forklaring eller markdown. '
-    +'Felter: "reagens" (produktnavn/antistoff), "lot" (lotnummer), '
-    +'"utgaar" (utløpsdato/EXP, format YYYY-MM-DD), "ventana" (Ventana-/katalognummer, ellers tom), '
-    +'"oppbevaring" ("kjol" hvis 2-8C/refrigerated, ellers "rom"). '
-    +'Svar: {"reagens":"","lot":"","utgaar":"","ventana":"","oppbevaring":""}';
-  try{
-    var m=captured.match(/^data:(image\/[\w.+-]+);base64,(.+)$/);
-    var resp=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-request-in-browser':'true','content-type':'application/json'},
-      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:512,messages:[{role:'user',content:[
-        {type:'image',source:{type:'base64',media_type:m?m[1]:'image/jpeg',data:m?m[2]:captured.replace(/^data:[^,]+,/,'')}},
-        {type:'text',text:prompt}
-      ]}]})
-    });
-    if(!resp.ok){var er=await resp.json().catch(function(){return{};});throw new Error((er.error&&er.error.message)||'HTTP '+resp.status);}
-    var data=await resp.json(),j=parseJ(data.content[0].text),exp=normD(j.utgaar);
-    addRow({navn:j.reagens||'',lot:j.lot||'',exp:exp,ventana:j.ventana||'',storage:j.oppbevaring==='rom'?'rom':'kjol',mDato:today(),komm:(j.utgaar&&!exp?'Utløp lest av bilde: '+j.utgaar:'')},true);
-    closeScan();
-  }catch(e){
-    phase('preview');
-    document.getElementById('scan-err').textContent='Kunne ikke lese bildet: '+(e.message||'ukjent feil')+'. Prøv et tydeligere bilde, eller fyll inn manuelt.';
-    document.getElementById('scan-err').style.display='block';
-  }
-}
-function parseJ(t){
-  if(!t)return{};t=String(t).replace(/```json/gi,'').replace(/```/g,'').trim();
-  var a=t.indexOf('{'),b=t.lastIndexOf('}');
-  if(a>=0&&b>a)t=t.slice(a,b+1);
-  try{return JSON.parse(t);}catch(e){return{};}
-}
-function normD(s){
-  if(!s)return'';s=String(s).trim();
-  if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
-  var d=new Date(s);return isNaN(d.getTime())?'':d.toISOString().slice(0,10);
 }
 
 // Shared file
@@ -523,7 +325,7 @@ function loadJson(txt,name){
   var r=Array.isArray(data)?data:(data&&Array.isArray(data.rows)?data.rows:null);
   if(!r){alert('Filen inneholder ingen reagensliste.');return;}
   if(rows.length>0&&!confirm('Dette erstatter den lokale listen. Fortsette?'))return;
-  rows=r.map(function(x){return emptyRow({navn:x.navn||'',storage:x.storage==='rom'?'rom':'kjol',ventana:x.ventana||'',lot:x.lot||'',exp:x.exp||'',mDato:x.mDato||'',mSign:x.mSign||'',tDato:x.tDato||'',tSign:x.tSign||'',komm:x.komm||''});});
+  rows=r.map(function(x){var o={parentId:x.parentId||null,navn:x.navn||'',storage:x.storage==='rom'?'rom':'kjol',ventana:x.ventana||'',lot:x.lot||'',exp:x.exp||'',mDato:x.mDato||'',mSign:x.mSign||'',tDato:x.tDato||'',tSign:x.tSign||'',komm:x.komm||''};if(x.id)o.id=x.id;return emptyRow(o);});
   persist();fileName=name||fileName;updateFileInd();renderTable();
 }
 async function saveToFile(){
@@ -569,29 +371,14 @@ function exportCsv(){
   setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
 }
 
-// ── Supabase ────────────────────────────────────────────────────────────────
-var SBURL_KEY='fk_sb_url', SBKEY_KEY='fk_sb_key';
+// ── Supabase-konfigurasjon ───────────────────────────────────────────────────
+// Lim inn dine verdier fra supabase.com → Project Settings → API
+var SB_URL = '';   // eks: 'https://xxxxxxxxxxxx.supabase.co'
+var SB_KEY = '';   // eks: 'eyJhbGciOiJIUzI1NiIs...'
+// ────────────────────────────────────────────────────────────────────────────
+
 var sbSyncTimer={};
-
-var SB_SQL=
-"create table if not exists reagenser (\n"+
-"  id text primary key,\n"+
-"  navn text default '',\n"+
-"  storage text default 'kjol',\n"+
-"  ventana text default '',\n"+
-"  lot text default '',\n"+
-"  exp text default '',\n"+
-"  \"mDato\" text default '',\n"+
-"  \"mSign\" text default '',\n"+
-"  \"tDato\" text default '',\n"+
-"  \"tSign\" text default '',\n"+
-"  komm text default '',\n"+
-"  updated_at timestamptz default now()\n"+
-");\n"+
-"alter table reagenser enable row level security;\n"+
-"create policy \"allow all\" on reagenser for all using (true) with check (true);";
-
-function sbCreds(){return{url:(localStorage.getItem(SBURL_KEY)||'').replace(/\/$/,''),key:localStorage.getItem(SBKEY_KEY)||''};}
+function sbCreds(){return{url:SB_URL.trim().replace(/\/$/,''),key:SB_KEY.trim()};}
 function sbActive(){var c=sbCreds();return !!(c.url&&c.key);}
 function sbHdr(){var c=sbCreds();return{'apikey':c.key,'Authorization':'Bearer '+c.key,'Content-Type':'application/json','Prefer':'return=representation'};}
 
@@ -612,7 +399,7 @@ async function sbLoad(showAlert){
     var r=await fetch(c.url+'/rest/v1/reagenser?select=*&order=updated_at.asc',{headers:sbHdr()});
     if(!r.ok)throw new Error('HTTP '+r.status);
     var data=await r.json();
-    rows=data.map(function(x){return emptyRow({id:x.id,navn:x.navn||'',storage:x.storage==='rom'?'rom':'kjol',ventana:x.ventana||'',lot:x.lot||'',exp:x.exp||'',mDato:x.mDato||'',mSign:x.mSign||'',tDato:x.tDato||'',tSign:x.tSign||'',komm:x.komm||''});});
+    rows=data.map(function(x){return emptyRow({id:x.id,parentId:x.parent_id||null,navn:x.navn||'',storage:x.storage==='rom'?'rom':'kjol',ventana:x.ventana||'',lot:x.lot||'',exp:x.exp||'',mDato:x.mDato||'',mSign:x.mSign||'',tDato:x.tDato||'',tSign:x.tSign||'',komm:x.komm||''});});
     persist();renderTable();
     setSbStatus('ok','Synkronisert');
     if(showAlert)setSbStatus('ok','Oppdatert ('+rows.length+' rader)');
@@ -624,7 +411,7 @@ async function sbLoad(showAlert){
 
 async function sbUpsert(row){
   if(!sbActive())return;
-  var c=sbCreds(),body=JSON.stringify([{id:row.id,navn:row.navn,storage:row.storage,ventana:row.ventana,lot:row.lot,exp:row.exp,mDato:row.mDato,mSign:row.mSign,tDato:row.tDato,tSign:row.tSign,komm:row.komm,updated_at:new Date().toISOString()}]);
+  var c=sbCreds(),body=JSON.stringify([{id:row.id,parent_id:row.parentId||null,navn:row.navn,storage:row.storage,ventana:row.ventana,lot:row.lot,exp:row.exp,mDato:row.mDato,mSign:row.mSign,tDato:row.tDato,tSign:row.tSign,komm:row.komm,updated_at:new Date().toISOString()}]);
   setSbStatus('syncing','Lagrer&#8230;');
   try{
     var r=await fetch(c.url+'/rest/v1/reagenser',{method:'POST',headers:Object.assign({},sbHdr(),{'Prefer':'resolution=merge-duplicates,return=minimal'}),body:body});
@@ -653,62 +440,14 @@ function updateSbBar(){
   var active=sbActive();
   document.getElementById('sb-bar').style.display=active?'flex':'none';
   document.getElementById('file-bar').style.display=active?'none':'flex';
-  document.getElementById('sbbtn').style.color=active?'#2a7a52':'#7c8a91';
-  document.getElementById('sbbtn').style.borderColor=active?'#b0dac0':'#c7d0d6';
-}
-
-// Supabase modal
-function openSbModal(){
-  var c=sbCreds();
-  document.getElementById('sb-url-input').value=c.url;
-  document.getElementById('sb-key-input').value=c.key;
-  document.getElementById('sb-test-result').style.display='none';
-  document.getElementById('sb-sql').textContent=SB_SQL;
-  document.getElementById('sb-modal').style.display='flex';
-}
-function closeSbModal(){document.getElementById('sb-modal').style.display='none';}
-function saveSb(){
-  var u=document.getElementById('sb-url-input').value.trim().replace(/\/$/,'');
-  var k=document.getElementById('sb-key-input').value.trim();
-  if(u)localStorage.setItem(SBURL_KEY,u);else localStorage.removeItem(SBURL_KEY);
-  if(k)localStorage.setItem(SBKEY_KEY,k);else localStorage.removeItem(SBKEY_KEY);
-  updateSbBar();closeSbModal();
-  if(sbActive())sbLoad(false);
-}
-function clearSb(){
-  localStorage.removeItem(SBURL_KEY);localStorage.removeItem(SBKEY_KEY);
-  document.getElementById('sb-url-input').value='';document.getElementById('sb-key-input').value='';
-  document.getElementById('sb-test-result').style.display='none';
-  updateSbBar();closeSbModal();
-}
-async function testSb(){
-  var u=document.getElementById('sb-url-input').value.trim().replace(/\/$/,'');
-  var k=document.getElementById('sb-key-input').value.trim();
-  var res=document.getElementById('sb-test-result');
-  res.style.display='block';res.style.background='#fdf6e6';res.style.color='#8a6300';res.textContent='Tester&#8230;';
-  try{
-    var r=await fetch(u+'/rest/v1/reagenser?select=id&limit=1',{headers:{'apikey':k,'Authorization':'Bearer '+k}});
-    if(r.status===401)throw new Error('Ugyldig n&#248;kkel (401)');
-    if(r.status===404)throw new Error('Tabell «reagenser» finnes ikke – kj&#248;r SQL-en over');
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    res.style.background='#eaf5ef';res.style.color='#2a7a52';res.textContent='&#10003; Tilkobling OK! Lagre for &#229; aktivere.';
-  }catch(e){
-    res.style.background='#fbeceb';res.style.color='#a5342a';res.textContent='Feil: '+(e.message||e);
-  }
-}
-function copySql(){
-  navigator.clipboard.writeText(SB_SQL).then(function(){
-    var b=event.target;var t=b.textContent;b.textContent='Kopiert!';setTimeout(function(){b.textContent=t;},1500);
-  }).catch(function(){});
 }
 
 // ── Init ────────────────────────────────────────────────────────────────────
 document.getElementById('printdate').textContent=today();
 try{var raw=localStorage.getItem(SKEY);rows=raw?JSON.parse(raw):[];if(!Array.isArray(rows))rows=[];}catch(e){rows=[];}
 renderTable();
-updateApiBtn();
 updateSbBar();
-if(sbActive())sbLoad(false);
+if(sbActive())sbLoad(false);else{document.getElementById('sb-bar').style.display='none';document.getElementById('file-bar').style.display='flex';}
 
 if('serviceWorker' in navigator){
   window.addEventListener('load',function(){navigator.serviceWorker.register('./sw.js');});
