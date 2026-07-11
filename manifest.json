@@ -1,0 +1,20 @@
+{
+  "name": "Farge reagenser – registrering av lot",
+  "short_name": "Fargekit",
+  "description": "Registrering av lot for fargereagenser – UNN Klinisk Patologi",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#eef1f3",
+  "theme_color": "#2f6076",
+  "lang": "nb",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

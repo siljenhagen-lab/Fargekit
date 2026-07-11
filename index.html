@@ -1,0 +1,2187 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Farge reagenser – registrering av lot</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon.svg">
+<meta name="theme-color" content="#2f6076">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fargekit">
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
+  }
+</script>
+<script>
+// GENERATED from dc-runtime/src/*.ts — do not edit. Rebuild with `cd dc-runtime && bun run build`.
+"use strict";
+(() => {
+  var __defProp = Object.defineProperty;
+  var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+  var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+
+  // src/react.ts
+  function getReact() {
+    const R = window.React;
+    if (!R) throw new Error("dc-runtime: window.React is not available yet");
+    return R;
+  }
+  function getReactDOM() {
+    const RD = window.ReactDOM;
+    if (!RD) throw new Error("dc-runtime: window.ReactDOM is not available yet");
+    return RD;
+  }
+  var h = ((...args) => getReact().createElement(
+    ...args
+  ));
+
+  // src/parse.ts
+  function parseDcDocument(doc) {
+    const dc = doc.querySelector("x-dc");
+    if (!dc) return null;
+    const scriptEl = doc.querySelector("script[data-dc-script]");
+    const { props, preview } = parseDataProps(
+      scriptEl?.getAttribute("data-props") ?? null
+    );
+    return {
+      template: dc.innerHTML,
+      js: scriptEl ? scriptEl.textContent || "" : "",
+      props,
+      preview
+    };
+  }
+  function parseDcText(src) {
+    const openMatch = /<x-dc(?:\s[^>]*)?>/.exec(src);
+    if (!openMatch) return null;
+    const close = src.lastIndexOf("</x-dc>");
+    if (close === -1 || close < openMatch.index) return null;
+    const template = src.slice(openMatch.index + openMatch[0].length, close);
+    const doc = new DOMParser().parseFromString(src, "text/html");
+    const scriptEl = doc.querySelector("script[data-dc-script]");
+    const { props, preview } = parseDataProps(
+      scriptEl?.getAttribute("data-props") ?? null
+    );
+    return {
+      template,
+      js: scriptEl ? scriptEl.textContent || "" : "",
+      props,
+      preview
+    };
+  }
+  function parseDataProps(raw) {
+    if (!raw) return { props: null, preview: null };
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return { props: null, preview: null };
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { props: null, preview: null };
+    }
+    const obj = parsed;
+    const preview = obj.$preview && typeof obj.$preview === "object" ? obj.$preview : null;
+    const rest = {};
+    for (const k of Object.keys(obj)) {
+      if (k[0] !== "$") rest[k] = obj[k];
+    }
+    return { props: Object.keys(rest).length ? rest : null, preview };
+  }
+  function dcNameFromPath(pathname) {
+    let p = pathname || "";
+    try {
+      p = decodeURIComponent(p);
+    } catch {
+    }
+    const base = p.split("/").pop() || "Root";
+    return base.replace(/\.dc\.html$/, "").replace(/\.html?$/, "") || "Root";
+  }
+
+  // src/boot.ts
+  var BASE_CSS = `
+    .sc-placeholder{background:rgba(255,255,255,.3);border:1px solid rgba(0,0,0,.5);
+      border-radius:2px;box-sizing:border-box;overflow:hidden}
+    @keyframes sc-shine{0%{background-position:100% 50%}100%{background-position:0% 50%}}
+    html.sc-dc-streaming .sc-placeholder,
+    html.sc-dc-streaming .sc-interp.sc-missing{position:relative;
+      background:color-mix(in srgb,currentColor 5%,transparent);
+      border-color:transparent}
+    html.sc-dc-streaming .sc-placeholder::before,
+    html.sc-dc-streaming .sc-interp.sc-missing::before{content:'';
+      position:absolute;inset:0;pointer-events:none;
+      background:linear-gradient(90deg,rgba(217,119,87,0) 25%,rgba(247,225,211,.95) 37%,rgba(217,119,87,0) 63%);
+      background-size:400% 100%;animation:sc-shine 1.4s ease infinite}
+    html.sc-dc-streaming .sc-placeholder:nth-child(n+9 of .sc-placeholder)::before,
+    html.sc-dc-streaming .sc-interp.sc-missing:nth-child(n+9 of .sc-interp.sc-missing)::before{animation:none;
+      background:color-mix(in srgb,currentColor 8%,transparent)}
+    .sc-placeholder-error{padding:4px 8px;font:11px/1.4 ui-monospace,monospace;
+      color:rgba(0,0,0,.7);word-break:break-word}
+    .sc-interp.sc-missing{display:inline-block;width:2em;height:1em;overflow:hidden;
+      vertical-align:text-bottom;background:rgba(255,255,255,.3);border:1px solid rgba(0,0,0,.5);
+      border-radius:2px;box-sizing:border-box;color:transparent;
+      user-select:none}
+    .sc-interp.sc-unresolved{font-family:ui-monospace,monospace;font-size:.85em;
+      color:rgba(0,0,0,.5);background:rgba(0,0,0,.05);border-radius:3px;
+      padding:0 3px}
+    .sc-host.sc-has-error{position:relative}
+    .sc-logic-error{position:absolute;top:8px;left:8px;z-index:2147483647;max-width:60ch;
+      padding:6px 10px;background:#b00020;color:#fff;font:12px/1.4 ui-monospace,monospace;
+      border-radius:4px;white-space:pre-wrap;pointer-events:none}
+    /* Mirrors PRINT_BASELINE_CSS in apps/web deck-stage-export.ts \u2014 keep both
+       in sync until dc-runtime regains a build step. */
+    @media print {
+      @page { margin: 0.5cm; }
+      section, article, figure, table { break-inside: avoid; }
+      *, *::before, *::after {
+        print-color-adjust: exact; -webkit-print-color-adjust: exact;
+        backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+        animation-delay: -99s !important; animation-duration: .001s !important;
+        animation-iteration-count: 1 !important; animation-fill-mode: both !important;
+        animation-play-state: running !important; transition-duration: 0s !important;
+      }
+    }
+  `;
+  var FULL_PAGE_CSS = "html,body{height:100%;margin:0}#dc-root,#dc-root>.sc-host{height:100%}";
+  function rootNameForDocument(doc, loc) {
+    let bootPath = loc.pathname || "";
+    if (!/\.dc\.html?$/i.test(safeDecode(bootPath))) {
+      try {
+        bootPath = new URL(doc.baseURI || "/").pathname;
+      } catch {
+      }
+    }
+    return dcNameFromPath(bootPath);
+  }
+  function safeDecode(s) {
+    try {
+      return decodeURIComponent(s);
+    } catch {
+      return s;
+    }
+  }
+  function boot(runtime, doc = document) {
+    const parsed = parseDcDocument(doc);
+    if (!parsed) return null;
+    const React = getReact();
+    const rootName = rootNameForDocument(doc, location);
+    runtime.markFetched(rootName);
+    runtime.adoptParsed(rootName, parsed);
+    fetch(location.href).then((res) => res.ok ? res.text() : "").then((t) => {
+      const raw = t ? parseDcText(t) : null;
+      if (raw?.template) runtime.updateHtml(rootName, raw.template);
+    }).catch(() => {
+    });
+    const dc = doc.querySelector("x-dc");
+    const hostEl = doc.createElement("div");
+    hostEl.id = "dc-root";
+    dc.replaceWith(hostEl);
+    if (!parsed.preview) {
+      const s = doc.createElement("style");
+      s.textContent = FULL_PAGE_CSS;
+      doc.head.appendChild(s);
+    }
+    const Root = runtime.getDC(rootName);
+    const entry = runtime.registry.get(rootName);
+    function StandaloneRoot() {
+      const [, setTick] = React.useState(0);
+      React.useEffect(() => {
+        const sub = () => setTick((n) => n + 1);
+        entry.subs.add(sub);
+        return () => {
+          entry.subs.delete(sub);
+        };
+      }, []);
+      return h(Root, entry.propOverrides || null);
+    }
+    const ReactDOM = getReactDOM();
+    if (ReactDOM.createRoot)
+      ReactDOM.createRoot(hostEl).render(h(StandaloneRoot));
+    else ReactDOM.render(h(StandaloneRoot), hostEl);
+    return rootName;
+  }
+
+  // src/expr.ts
+  var IDENT_RE = /^[A-Za-z_$][A-Za-z0-9_$]*/;
+  var NUMBER_RE = /^-?\d+(\.\d+)?$/;
+  function resolve(vals, src) {
+    const expr = String(src).trim();
+    if (!expr) return void 0;
+    if (expr[0] === "(" && expr[expr.length - 1] === ")" && parensWrapWhole(expr)) {
+      return resolve(vals, expr.slice(1, -1));
+    }
+    const eq = findTopLevelEquality(expr);
+    if (eq) {
+      const lv = resolve(vals, expr.slice(0, eq.index));
+      const rv = resolve(vals, expr.slice(eq.index + eq.op.length));
+      switch (eq.op) {
+        case "===":
+          return lv === rv;
+        case "!==":
+          return lv !== rv;
+        case "==":
+          return lv == rv;
+        default:
+          return lv != rv;
+      }
+    }
+    if (expr[0] === "!") return !resolve(vals, expr.slice(1));
+    if (expr === "true") return true;
+    if (expr === "false") return false;
+    if (expr === "null") return null;
+    if (expr === "undefined") return void 0;
+    if (NUMBER_RE.test(expr)) return Number(expr);
+    if (expr.length >= 2 && (expr[0] === '"' || expr[0] === "'") && expr[expr.length - 1] === expr[0]) {
+      return expr.slice(1, -1);
+    }
+    return resolvePath(vals, expr);
+  }
+  function parensWrapWhole(expr) {
+    let depth = 0;
+    for (let i = 0; i < expr.length - 1; i++) {
+      if (expr[i] === "(") depth++;
+      else if (expr[i] === ")") {
+        depth--;
+        if (depth === 0) return false;
+      }
+    }
+    return true;
+  }
+  function findTopLevelEquality(expr) {
+    let depth = 0;
+    for (let i = 0; i < expr.length; i++) {
+      const c = expr[i];
+      if (c === "[" || c === "(") depth++;
+      else if (c === "]" || c === ")") depth--;
+      else if (depth === 0 && (c === "=" || c === "!") && expr[i + 1] === "=") {
+        if (i > 0 && (expr[i - 1] === "=" || expr[i - 1] === "!")) continue;
+        if (!expr.slice(0, i).trim()) continue;
+        const op = expr[i + 2] === "=" ? c + "==" : c + "=";
+        return { index: i, op };
+      }
+    }
+    return null;
+  }
+  function resolvePath(vals, expr) {
+    const head = expr.match(IDENT_RE);
+    if (!head) return void 0;
+    let cur = vals == null ? void 0 : vals[head[0]];
+    let i = head[0].length;
+    while (i < expr.length) {
+      if (expr[i] === ".") {
+        const m = expr.slice(i + 1).match(IDENT_RE) || expr.slice(i + 1).match(/^\d+/);
+        if (!m) return void 0;
+        cur = cur == null ? void 0 : cur[m[0]];
+        i += 1 + m[0].length;
+      } else if (expr[i] === "[") {
+        let depth = 1;
+        let j = i + 1;
+        while (j < expr.length && depth > 0) {
+          if (expr[j] === "[") depth++;
+          else if (expr[j] === "]") {
+            depth--;
+            if (depth === 0) break;
+          }
+          j++;
+        }
+        if (depth !== 0) return void 0;
+        const key = resolve(vals, expr.slice(i + 1, j));
+        cur = cur == null ? void 0 : cur[key];
+        i = j + 1;
+      } else {
+        return void 0;
+      }
+    }
+    return cur;
+  }
+
+  // src/encode.ts
+  var CAMEL_ATTR = "sc-camel-";
+  var RAW_WRAP = {
+    select: "sc-raw-select",
+    table: "sc-raw-table",
+    tbody: "sc-raw-tbody",
+    thead: "sc-raw-thead",
+    tfoot: "sc-raw-tfoot",
+    tr: "sc-raw-tr",
+    td: "sc-raw-td",
+    th: "sc-raw-th",
+    caption: "sc-raw-caption"
+  };
+  var RAW_UNWRAP = Object.fromEntries(
+    Object.entries(RAW_WRAP).map(([k, v]) => [v, k])
+  );
+  var EVENT_MAP = {
+    onclick: "onClick",
+    onchange: "onChange",
+    oninput: "onInput",
+    onsubmit: "onSubmit",
+    onkeydown: "onKeyDown",
+    onkeyup: "onKeyUp",
+    onkeypress: "onKeyPress",
+    onmousedown: "onMouseDown",
+    onmouseup: "onMouseUp",
+    onmouseenter: "onMouseEnter",
+    onmouseleave: "onMouseLeave",
+    onfocus: "onFocus",
+    onblur: "onBlur",
+    ondoubleclick: "onDoubleClick",
+    oncontextmenu: "onContextMenu"
+  };
+  var ATTRS = `(?:[^>"']|"[^"]*"|'[^']*')*`;
+  var IMPORT_SELF_CLOSE_RE = new RegExp(
+    "<(x-import|dc-import)(" + ATTRS + ")/>",
+    "gi"
+  );
+  var CAMEL_ATTR_RE = /(\s)([a-z]+[A-Z][A-Za-z0-9]*)(\s*=)/g;
+  function encodeCase(html) {
+    html = html.replace(
+      IMPORT_SELF_CLOSE_RE,
+      (_, t, a) => "<" + t + a + "></" + t + ">"
+    );
+    html = html.replace(/<helmet(\s|>)/gi, "<sc-helmet$1");
+    html = html.replace(/<\/helmet\s*>/gi, "</sc-helmet>");
+    html = html.replace(
+      CAMEL_ATTR_RE,
+      (_, sp, name, eq) => sp + CAMEL_ATTR + name.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase()) + eq
+    );
+    for (const [real, alias] of Object.entries(RAW_WRAP)) {
+      html = html.replace(
+        new RegExp("(</?)" + real + "(?=[\\s>])", "gi"),
+        "$1" + alias
+      );
+    }
+    return html;
+  }
+  function kebabToCamel(s) {
+    return s.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  }
+  function cssToObj(css) {
+    const o = {};
+    for (const decl of css.split(";")) {
+      const i = decl.indexOf(":");
+      if (i < 0) continue;
+      const prop = decl.slice(0, i).trim();
+      o[prop.startsWith("--") ? prop : kebabToCamel(prop)] = decl.slice(i + 1).trim();
+    }
+    return o;
+  }
+  function compileAttr(raw) {
+    const whole = raw.match(/^\s*\{\{([\s\S]+?)\}\}\s*$/);
+    if (whole) {
+      const path = whole[1];
+      return (vals) => resolve(vals, path);
+    }
+    if (raw.includes("{{")) {
+      const parts = raw.split(/\{\{([\s\S]+?)\}\}/g);
+      return (vals) => parts.map((s, i) => i & 1 ? resolve(vals, s) ?? "" : s).join("");
+    }
+    return () => raw;
+  }
+
+  // src/compile.ts
+  function collectProps(node, isComponent, host) {
+    const propGetters = [];
+    const pseudoClasses = [];
+    let hintSize = null;
+    for (const { name, value } of [...node.attributes]) {
+      if (name === "sc-name" || name === "data-dc-tpl") continue;
+      let key = name;
+      if (key.startsWith(CAMEL_ATTR))
+        key = kebabToCamel(key.slice(CAMEL_ATTR.length));
+      if (key === "hint-size") {
+        hintSize = value;
+        continue;
+      }
+      if (key.startsWith("style-")) {
+        pseudoClasses.push(host.pseudoClass(key.slice(6), value));
+        continue;
+      }
+      if (isComponent) {
+        if (key.includes("-")) key = kebabToCamel(key);
+      } else {
+        if (key === "class") key = "className";
+        else if (key === "for") key = "htmlFor";
+        else if (key.startsWith("on"))
+          key = EVENT_MAP[key] || "on" + key[2].toUpperCase() + key.slice(3);
+      }
+      propGetters.push([key, compileAttr(value)]);
+    }
+    return { propGetters, pseudoClasses, hintSize };
+  }
+  var HOST_STYLE_PROPS = /* @__PURE__ */ new Set([
+    "position",
+    "left",
+    "right",
+    "top",
+    "bottom",
+    "inset",
+    "width",
+    "height",
+    "z-index",
+    "transform"
+  ]);
+  function hostPositionStyle(style) {
+    const all = typeof style === "string" ? cssToObj(style) : style != null && typeof style === "object" ? style : null;
+    if (!all) return void 0;
+    const out = {};
+    for (const [k, v] of Object.entries(all)) {
+      const kebab = k.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase());
+      if (HOST_STYLE_PROPS.has(kebab)) out[k] = v;
+    }
+    return Object.keys(out).length ? out : void 0;
+  }
+  function compileTemplate(html, host) {
+    const tpl = document.createElement("template");
+    //! nosemgrep: direct-inner-html-assignment
+    tpl.innerHTML = encodeCase(html);
+    let tplN = 0;
+    (function stamp(node) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        node.setAttribute("data-dc-tpl", String(tplN++));
+      }
+      for (const c of node.childNodes) stamp(c);
+    })(tpl.content);
+    const builders = walkChildren(tpl.content, host);
+    const render = ((vals, ctx) => builders.map((b, i) => b(vals || {}, ctx, i)));
+    render.__annotated = tpl.innerHTML;
+    return render;
+  }
+  function walkChildren(node, host) {
+    return [...node.childNodes].map((c) => walk(c, host)).filter((b) => b != null);
+  }
+  function walk(node, host) {
+    if (node.nodeType === Node.TEXT_NODE) return walkText(node);
+    if (node.nodeType !== Node.ELEMENT_NODE) return null;
+    const el = node;
+    const tag = el.tagName.toLowerCase();
+    if (tag === "sc-for") return walkFor(el, host);
+    if (tag === "sc-if") return walkIf(el, host);
+    if (tag === "x-import") return walkXImport(el, host);
+    if (tag === "sc-helmet") return host.helmet(el);
+    if (tag === "dc-import") return walkComponent(el, host);
+    return walkElement(el, host);
+  }
+  var warnedHoles = /* @__PURE__ */ new Set();
+  function warnUnresolved(ctx, what) {
+    const key = (ctx?.__name || "?") + "\0" + what;
+    if (warnedHoles.has(key)) return;
+    warnedHoles.add(key);
+    console.warn("[dc-runtime] " + (ctx?.__name || "template") + ": " + what);
+  }
+  function walkText(node) {
+    const txt = node.nodeValue ?? "";
+    if (!txt.includes("{{")) {
+      if (!txt.trim() && !txt.includes(" ")) return null;
+      return () => txt;
+    }
+    const parts = txt.split(/\{\{([\s\S]+?)\}\}/g);
+    return (vals, ctx, key) => h(
+      getReact().Fragment,
+      { key },
+      ...parts.map((p, i) => {
+        if (!(i & 1)) return p;
+        const v = resolve(vals, p);
+        if (v === void 0) {
+          if (!ctx?.__streamingNow) {
+            if (document.body?.hasAttribute("data-dc-editor-on")) {
+              return h(
+                "span",
+                { key: i, className: "sc-interp sc-unresolved" },
+                "{{ " + p.trim() + " }}"
+              );
+            }
+            warnUnresolved(
+              ctx,
+              "{{ " + p.trim() + " }} never resolved \u2014 rendered as empty"
+            );
+            return null;
+          }
+          return h(
+            "span",
+            { key: i, className: "sc-interp sc-missing" },
+            p.trim()
+          );
+        }
+        if (getReact().isValidElement(v) || Array.isArray(v)) {
+          return h(getReact().Fragment, { key: i }, v);
+        }
+        if (v === null || typeof v === "boolean") return null;
+        return h("span", { key: i, className: "sc-interp" }, String(v));
+      })
+    );
+  }
+  function walkFor(el, host) {
+    const listGet = compileAttr(el.getAttribute("list") || "");
+    const asName = el.getAttribute("as") || "item";
+    const hintN = parseInt(el.getAttribute("hint-placeholder-count") || "0", 10);
+    const kids = walkChildren(el, host);
+    const listSrc = el.getAttribute("list") || "";
+    return (vals, ctx, key) => {
+      let list = listGet(vals);
+      if (!Array.isArray(list)) {
+        if (!ctx?.__streamingNow) {
+          if (list !== void 0 && list !== null) {
+            warnUnresolved(
+              ctx,
+              'sc-for list="' + listSrc + '" is not an array (' + typeof list + ")"
+            );
+          }
+          list = [];
+        } else {
+          list = hintN > 0 ? Array(hintN).fill(void 0) : [];
+        }
+      }
+      return h(
+        getReact().Fragment,
+        { key },
+        list.map((item, i) => {
+          const sub = { ...vals, [asName]: item, $index: i };
+          return h(
+            getReact().Fragment,
+            { key: i },
+            kids.map((b, j) => b(sub, ctx, j))
+          );
+        })
+      );
+    };
+  }
+  function walkIf(el, host) {
+    const valGet = compileAttr(el.getAttribute("value") || "");
+    const hintRaw = el.getAttribute("hint-placeholder-val");
+    const hintGet = hintRaw != null ? compileAttr(hintRaw) : null;
+    const kids = walkChildren(el, host);
+    return (vals, ctx, key) => {
+      let v = valGet(vals);
+      if (v === void 0 && hintGet && ctx?.__streamingNow) v = hintGet(vals);
+      return v ? h(
+        getReact().Fragment,
+        { key },
+        kids.map((b, j) => b(vals, ctx, j))
+      ) : null;
+    };
+  }
+  function walkComponent(el, host) {
+    const name = el.getAttribute("name") || el.getAttribute("component") || "";
+    el.removeAttribute("name");
+    el.removeAttribute("component");
+    const tplId = el.getAttribute("data-dc-tpl");
+    const styleRaw = el.getAttribute("style");
+    el.removeAttribute("style");
+    const styleGet = styleRaw != null ? compileAttr(styleRaw) : null;
+    const { propGetters, hintSize } = collectProps(el, true, host);
+    const kids = walkChildren(el, host);
+    return (vals, ctx, key) => {
+      const props = {
+        key,
+        __hintSize: hintSize,
+        __tplId: tplId,
+        __hostStyle: styleGet ? hostPositionStyle(styleGet(vals)) : void 0
+      };
+      for (const [k, g] of propGetters) props[k] = g(vals);
+      if (kids.length) props.children = kids.map((b, j) => b(vals, ctx, j));
+      return h(host.component(name), props);
+    };
+  }
+  function walkXImport(el, host) {
+    const globalNameGet = compileAttr(
+      el.getAttribute("component-from-global-scope") || ""
+    );
+    const exportNameGet = compileAttr(
+      el.getAttribute("component") || el.getAttribute("name") || ""
+    );
+    const url = el.getAttribute("from") || el.getAttribute("src") || el.getAttribute("import") || "";
+    const kind = /\.(jsx|tsx)(\?|#|$)/i.test(url) ? "jsx" : "js";
+    const tplId = el.getAttribute("data-dc-tpl");
+    const styleRaw = el.getAttribute("style");
+    el.removeAttribute("style");
+    const styleGet = styleRaw != null ? compileAttr(styleRaw) : null;
+    const wrap = tplId != null || styleGet != null;
+    const { propGetters, hintSize } = collectProps(el, true, host);
+    const hasContent = el.children.length > 0 || !!(el.textContent || "").trim();
+    const kids = hasContent ? walkChildren(el, host) : [];
+    const urlBindable = url.includes("{{");
+    if (url && !urlBindable) host.loadExternal(kind, url);
+    const evalName = (g, vals) => {
+      const v = g(vals);
+      const s = v == null ? "" : String(v);
+      return s.includes("{{") ? "" : s;
+    };
+    return (vals, ctx, key) => {
+      const globalName = evalName(globalNameGet, vals);
+      const name = globalName || evalName(exportNameGet, vals);
+      const C = !name || urlBindable ? null : globalName ? host.resolveExternalGlobal(url, globalName) : host.resolveExternal(url, name);
+      const hostStyle = styleGet ? hostPositionStyle(styleGet(vals)) : void 0;
+      const wrapper = wrap ? {
+        key,
+        className: "sc-host-x",
+        "data-dc-tpl": tplId,
+        style: hostStyle || { display: "contents" }
+      } : null;
+      if (!C) {
+        const error = urlBindable ? "x-import `from` cannot contain {{ \u2026 }} \u2014 module URLs are resolved at parse time; use a literal URL" : host.resolveExternalError(url, name);
+        const ph = host.placeholder({
+          key: wrapper ? void 0 : key,
+          name,
+          hintSize,
+          error
+        });
+        return wrapper ? h("div", wrapper, ph) : ph;
+      }
+      const props = wrapper ? {} : { key };
+      let unresolvedHole = false;
+      for (const [k, g] of propGetters) {
+        if (k === "component" || k === "componentFromGlobalScope" || k === "name" || k === "from" || k === "src" || k === "import") {
+          continue;
+        }
+        const v = g(vals);
+        if (v === void 0) unresolvedHole = true;
+        props[k] = v;
+      }
+      if (unresolvedHole && ctx?.__htmlStreamingNow) {
+        const ph = host.placeholder({
+          key: wrapper ? void 0 : key,
+          name,
+          hintSize,
+          error: null
+        });
+        return wrapper ? h("div", wrapper, ph) : ph;
+      }
+      if (kids.length) props.children = kids.map((b, j) => b(vals, ctx, j));
+      return wrapper ? h("div", wrapper, h(C, props)) : h(C, props);
+    };
+  }
+  function walkElement(el, host) {
+    const realTag = RAW_UNWRAP[el.localName] || el.localName;
+    const tplId = el.getAttribute("data-dc-tpl");
+    const { propGetters, pseudoClasses } = collectProps(el, false, host);
+    const kids = walkChildren(el, host);
+    return (vals, ctx, key) => {
+      const props = { key, "data-dc-tpl": tplId };
+      for (const [k, g] of propGetters) {
+        let v = g(vals);
+        if (k === "style" && typeof v === "string") v = cssToObj(v);
+        if ((k === "value" || k === "checked") && v === void 0) {
+          v = k === "checked" ? false : "";
+        }
+        props[k] = v;
+      }
+      if (pseudoClasses.length) {
+        props.className = [props.className, ...pseudoClasses].filter(Boolean).join(" ");
+      }
+      return h(realTag, props, ...kids.map((b, j) => b(vals, ctx, j)));
+    };
+  }
+
+  // src/logic.ts
+  var StreamableLogic = class {
+    constructor(props) {
+      __publicField(this, "props");
+      __publicField(this, "state", {});
+      /** Back-pointer to the wrapper component, installed after construction. */
+      __publicField(this, "__host");
+      this.props = props || {};
+    }
+    setState(update, cb) {
+      this.__host && this.__host.__setLogicState(update, cb);
+    }
+    forceUpdate() {
+      this.__host && this.__host.forceUpdate();
+    }
+    componentDidMount() {
+    }
+    componentDidUpdate(_prevProps) {
+    }
+    componentWillUnmount() {
+    }
+    /** The flat object the template renders against (merged over props). */
+    renderVals() {
+      return {};
+    }
+  };
+  function evalDcLogic(src) {
+    //! nosemgrep: eval-and-function-constructor
+    const fn = new Function(
+      "DCLogic",
+      "StreamableLogic",
+      "React",
+      src + '\n;return (typeof Component!=="undefined"&&Component)||undefined;'
+    );
+    return fn(StreamableLogic, StreamableLogic, getReact());
+  }
+
+  // src/component.ts
+  function shallowEqual(a, b) {
+    if (!b) return false;
+    const ak = Object.keys(a).filter((k) => k !== "children");
+    const bk = Object.keys(b).filter((k) => k !== "children");
+    if (ak.length !== bk.length) return false;
+    for (const k of ak) if (a[k] !== b[k]) return false;
+    return true;
+  }
+  function Placeholder({
+    name,
+    hintSize,
+    streaming,
+    error
+  }) {
+    const [w, hgt] = (hintSize || "100%,60px").split(",");
+    return h(
+      "div",
+      {
+        className: "sc-placeholder" + (streaming ? " sc-streaming" : ""),
+        style: { width: w.trim(), height: hgt && hgt.trim() },
+        title: name
+      },
+      error ? h(
+        "div",
+        { className: "sc-placeholder-error" },
+        (name ? name + ": " : "") + error
+      ) : null
+    );
+  }
+  function hintToMin(hint) {
+    if (!hint) return void 0;
+    const [w, hgt] = hint.split(",");
+    return { minWidth: w.trim(), minHeight: hgt && hgt.trim() };
+  }
+  function createComponentFactory(registry, ensureFetched) {
+    const React = getReact();
+    const AncestorContext = React.createContext([]);
+    class StreamableComponent extends React.Component {
+      constructor(props) {
+        super(props);
+        __publicField(this, "__name");
+        __publicField(this, "__sub");
+        __publicField(this, "__needsDidMount", false);
+        /** Snapshot of the registry's streaming flags taken at render time —
+         *  builders read it off the RenderCtx (this) to pick placeholder vs
+         *  render-nothing for unresolved values. */
+        __publicField(this, "__streamingNow", false);
+        __publicField(this, "__htmlStreamingNow", false);
+        /** When a construct throws, remember the (class, registry.ver, props)
+         *  triple so render-time reconcile doesn't re-attempt it on every parent
+         *  re-render. A registry bump (new class, template, external module
+         *  resolving via bumpAll) changes `ver` and breaks the memo so an
+         *  env-dependent constructor can self-heal. */
+        __publicField(this, "__failedLogic", null);
+        __publicField(this, "__failedUserProps", null);
+        __publicField(this, "__failedVer", -1);
+        /** Per-instance constructor error — kept here (not on the registry entry)
+         *  so one instance's successful construct can't hide a sibling's failure,
+         *  and a construct can never wipe an eval error `updateJs` recorded on
+         *  `r.logicError`. */
+        __publicField(this, "__ctorError", null);
+        __publicField(this, "logic");
+        this.__name = props.__name;
+        this.state = { __v: 0, __err: null };
+        this.__sub = () => {
+          if (this.state.__err) this.setState({ __err: null });
+          this.forceUpdate();
+        };
+        this.__makeLogic(registry.get(this.__name).Logic, null);
+        ensureFetched(this.__name);
+      }
+      /** Error-boundary hook: a render crash anywhere in this DC's subtree
+       *  (its own template, an x-import'd component, a child DC without its
+       *  own deeper boundary) lands here instead of unmounting the page. */
+      static getDerivedStateFromError(e) {
+        return { __err: e instanceof Error && e.message ? e.message : String(e) };
+      }
+      componentDidCatch(e, info) {
+        console.error(
+          "[dc-runtime] render error in <" + this.__name + ">:",
+          e,
+          info?.componentStack || ""
+        );
+      }
+      /** Instantiate the logic class (or the no-op base) and adopt `prevState`
+       *  over its initial state — used both at mount and on hot-swap. */
+      __makeLogic(Logic, prevState) {
+        const L = Logic || StreamableLogic;
+        try {
+          this.logic = new L(this.__userProps());
+          this.__failedLogic = null;
+          this.__failedUserProps = null;
+          this.__ctorError = null;
+        } catch (e) {
+          console.error(e);
+          this.__failedLogic = Logic;
+          this.__failedUserProps = this.__userProps();
+          this.__failedVer = registry.get(this.__name).ver;
+          this.__ctorError = this.__name + ": " + (e instanceof Error && e.message ? e.message : String(e));
+          this.logic = new StreamableLogic(
+            this.__userProps()
+          );
+        }
+        this.logic.__host = this;
+        if (prevState)
+          this.logic.state = { ...this.logic.state || {}, ...prevState };
+      }
+      /** The props the author's logic + template see — internal __-prefixed
+       *  wiring stripped. */
+      __userProps() {
+        const { __name, __hintSize, __tplId, __hostStyle, ...rest } = this.props;
+        return rest;
+      }
+      __setLogicState(update, cb) {
+        const prev = this.logic.state;
+        const patch = typeof update === "function" ? update(prev) : update;
+        this.logic.state = { ...prev, ...patch };
+        this.setState((s) => ({ __v: s.__v + 1 }), cb);
+      }
+      /** Swap the logic instance when the registry's Logic class changed
+       *  (streaming completion, hot reload). State carries over; didMount
+       *  re-fires after the swap commits so refs exist. */
+      __reconcileLogic() {
+        const r = registry.get(this.__name);
+        const Next = r.Logic;
+        const Cur = this.logic.constructor;
+        if (Next === Cur || !Next && Cur === StreamableLogic || Next === this.__failedLogic && r.ver === this.__failedVer && shallowEqual(this.__userProps(), this.__failedUserProps)) {
+          return;
+        }
+        if (!this.__needsDidMount) {
+          try {
+            this.logic.componentWillUnmount();
+          } catch (e) {
+            console.error(e);
+          }
+        }
+        this.__makeLogic(Next, this.logic.state);
+        this.__needsDidMount = true;
+      }
+      componentDidMount() {
+        registry.get(this.__name).subs.add(this.__sub);
+        try {
+          this.logic.componentDidMount();
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      componentDidUpdate(prevProps) {
+        this.logic.props = this.__userProps();
+        if (this.__needsDidMount) {
+          if (this.state.__err || !registry.get(this.__name).tpl) return;
+          this.__needsDidMount = false;
+          try {
+            this.logic.componentDidMount();
+          } catch (e) {
+            console.error(e);
+          }
+        } else {
+          try {
+            this.logic.componentDidUpdate(prevProps);
+          } catch (e) {
+            console.error(e);
+          }
+        }
+      }
+      componentWillUnmount() {
+        registry.get(this.__name).subs.delete(this.__sub);
+        if (!this.__needsDidMount) {
+          try {
+            this.logic.componentWillUnmount();
+          } catch (e) {
+            console.error(e);
+          }
+        }
+      }
+      render() {
+        const r = registry.get(this.__name);
+        const cls = "sc-host" + (r.htmlStreaming ? " sc-streaming-html" : "") + (r.jsStreaming ? " sc-streaming-js" : "");
+        const hintStyle = r.htmlStreaming ? hintToMin(this.props.__hintSize) : void 0;
+        const hostStyle = this.props.__hostStyle || hintStyle ? { ...hintStyle || {}, ...this.props.__hostStyle || {} } : void 0;
+        const hostBase = {
+          className: cls,
+          style: hostStyle,
+          "data-sc-name": this.__name,
+          "data-dc-tpl": this.props.__tplId
+        };
+        const chain = Array.isArray(this.context) ? this.context : [];
+        if (chain.includes(this.__name)) {
+          const cycle = [
+            ...chain.slice(chain.indexOf(this.__name)),
+            this.__name
+          ].join(" \u2192 ");
+          return h(
+            "div",
+            { ...hostBase, className: cls + " sc-has-error" },
+            h(Placeholder, {
+              name: this.__name,
+              hintSize: this.props.__hintSize,
+              error: "circular import: " + cycle
+            })
+          );
+        }
+        if (this.state.__err) {
+          return h(
+            "div",
+            { ...hostBase, className: cls + " sc-has-error" },
+            h(
+              "div",
+              { className: "sc-logic-error" },
+              this.__name + ": " + this.state.__err
+            ),
+            h(Placeholder, {
+              name: this.__name,
+              hintSize: this.props.__hintSize,
+              error: this.state.__err
+            })
+          );
+        }
+        this.__reconcileLogic();
+        if (!r.tpl) {
+          return h(
+            "div",
+            hostBase,
+            h(Placeholder, { name: this.__name, hintSize: this.props.__hintSize })
+          );
+        }
+        const userProps = this.__userProps();
+        this.logic.props = userProps;
+        let vals = userProps;
+        let renderErr = r.logicError || this.__ctorError;
+        try {
+          vals = { ...userProps, ...this.logic.renderVals() || {} };
+        } catch (e) {
+          console.error(e);
+          renderErr = this.__name + ".renderVals(): " + (e instanceof Error && e.message ? e.message : String(e));
+        }
+        this.__streamingNow = !!(r.htmlStreaming || r.jsStreaming);
+        this.__htmlStreamingNow = !!r.htmlStreaming;
+        return h(
+          "div",
+          { ...hostBase, className: cls + (renderErr ? " sc-has-error" : "") },
+          renderErr && h("div", { className: "sc-logic-error" }, renderErr),
+          h(
+            AncestorContext.Provider,
+            { value: [...chain, this.__name] },
+            r.tpl(vals, this)
+          )
+        );
+      }
+    }
+    __publicField(StreamableComponent, "contextType", AncestorContext);
+    const named = /* @__PURE__ */ new Map();
+    function getDC(name) {
+      const hit = named.get(name);
+      if (hit) return hit;
+      function Dispatcher(p) {
+        const [, setTick] = React.useState(0);
+        React.useEffect(() => {
+          const sub = () => setTick((n) => n + 1);
+          registry.get(name).subs.add(sub);
+          return () => {
+            registry.get(name).subs.delete(sub);
+          };
+        }, []);
+        ensureFetched(name);
+        return h(StreamableComponent, { ...p, __name: name });
+      }
+      Dispatcher.displayName = name;
+      named.set(name, Dispatcher);
+      return Dispatcher;
+    }
+    return {
+      getDC,
+      StreamableComponent
+    };
+  }
+
+  // src/external.ts
+  var isCustomElementName = (n) => !n.includes(".") && n.includes("-");
+  function isRenderableType(g) {
+    if (typeof g === "function") return !isElementClass(g);
+    return typeof g === "object" && g !== null && typeof g.$$typeof === "symbol";
+  }
+  function resolveDottedPath(root, name) {
+    let cur = root;
+    for (const seg of name.split(".")) {
+      if (cur == null) return void 0;
+      cur = cur[seg];
+    }
+    return cur;
+  }
+  var BABEL_URL = "https://unpkg.com/@babel/standalone@7.26.4/babel.min.js";
+  var GLOBAL_POLL_INTERVAL_MS = 50;
+  var GLOBAL_POLL_TIMEOUT_MS = 3e4;
+  function createExternalModules(onResolved) {
+    const cache = /* @__PURE__ */ new Map();
+    let babelLoading = null;
+    const reportedMissing = /* @__PURE__ */ new Map();
+    const polling = /* @__PURE__ */ new Set();
+    function ensureBabel() {
+      if (window.Babel) return Promise.resolve();
+      if (babelLoading) return babelLoading;
+      babelLoading = new Promise((res, rej) => {
+        const s = document.createElement("script");
+        s.src = BABEL_URL;
+        s.crossOrigin = "anonymous";
+        s.onload = () => res();
+        s.onerror = rej;
+        document.head.appendChild(s);
+      });
+      return babelLoading;
+    }
+    function load(kind, url) {
+      if (cache.has(url)) return;
+      cache.set(url, null);
+      console.info("[dc-runtime] x-import: loading", url, "(" + kind + ")");
+      const ready = kind === "jsx" ? ensureBabel() : Promise.resolve();
+      ready.then(() => fetch(url)).then((r) => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.text();
+      }).then((src) => {
+        const code = kind === "jsx" ? window.Babel.transform(src, {
+          filename: url,
+          presets: ["react", "typescript"]
+        }).code : src;
+        const module = { exports: {} };
+        const before = new Set(Object.keys(window));
+        //! nosemgrep: eval-and-function-constructor
+        new Function("React", "module", "exports", "require", code)(
+          getReact(),
+          module,
+          module.exports,
+          () => ({})
+        );
+        const globals = {};
+        for (const k of Object.keys(window)) {
+          if (!before.has(k) && typeof window[k] === "function") {
+            globals[k] = window[k];
+          }
+        }
+        cache.set(url, { mod: module.exports, globals });
+        console.info(
+          "[dc-runtime] x-import: loaded",
+          url,
+          "\u2014 exports:",
+          Object.keys(module.exports),
+          "window globals:",
+          Object.keys(globals)
+        );
+        onResolved();
+      }).catch((e) => {
+        cache.set(url, {
+          mod: {},
+          globals: {},
+          error: "failed to load: " + (e instanceof Error && e.message ? e.message : String(e))
+        });
+        console.error(
+          "[dc-runtime] x-import: FAILED to load",
+          url,
+          "(" + kind + ")",
+          e
+        );
+        onResolved();
+      });
+    }
+    function resolve2(url, name) {
+      const entry = cache.get(url);
+      if (!entry) return null;
+      const { mod, globals } = entry;
+      const C = mod && mod[name] || globals && globals[name] || typeof window !== "undefined" && window[name] || mod && mod.default;
+      if (typeof C === "function") return C;
+      const key = url + "\0" + name;
+      if (!reportedMissing.has(key)) {
+        reportedMissing.set(
+          key,
+          entry.error || 'no export named "' + name + '" (has: ' + Object.keys(mod).join(", ") + ")"
+        );
+        console.error(
+          "[dc-runtime] x-import: module",
+          url,
+          "loaded but has no component named",
+          JSON.stringify(name),
+          "\u2014 available exports:",
+          Object.keys(mod),
+          "window globals:",
+          Object.keys(globals),
+          ". The module must `module.exports = {" + name + "}` or set `window." + name + "`."
+        );
+      }
+      return null;
+    }
+    function waitForGlobal(name) {
+      if (polling.has(name)) return;
+      polling.add(name);
+      const started = Date.now();
+      const isCE = isCustomElementName(name);
+      const tick = () => {
+        const found = isCE ? customElements.get(name) : isRenderableType(resolveDottedPath(window, name));
+        if (found) {
+          polling.delete(name);
+          onResolved();
+          return;
+        }
+        if (Date.now() - started >= GLOBAL_POLL_TIMEOUT_MS) {
+          console.warn(
+            "[dc-runtime] x-import: global",
+            JSON.stringify(name),
+            "never appeared on window after " + GLOBAL_POLL_TIMEOUT_MS + "ms"
+          );
+          return;
+        }
+        setTimeout(tick, GLOBAL_POLL_INTERVAL_MS);
+      };
+      setTimeout(tick, GLOBAL_POLL_INTERVAL_MS);
+    }
+    function resolveGlobal(url, name) {
+      const isCE = isCustomElementName(name);
+      if (!url) {
+        if (isCE) {
+          if (customElements.get(name)) return name;
+          waitForGlobal(name);
+          return null;
+        }
+        const g2 = resolveDottedPath(window, name);
+        if (isRenderableType(g2)) return g2;
+        waitForGlobal(name);
+        return null;
+      }
+      const entry = cache.get(url);
+      if (!entry) return null;
+      if (isCE && customElements.get(name)) return name;
+      const g = entry.globals[name] ?? resolveDottedPath(window, name);
+      if (isRenderableType(g)) return g;
+      if (name.includes(".")) return null;
+      const key = url + "\0global\0" + name;
+      if (!reportedMissing.has(key)) {
+        reportedMissing.set(key, null);
+        if (isCE && !customElements.get(name)) {
+          console.warn(
+            "[dc-runtime] x-import:",
+            url,
+            "loaded but no custom element",
+            JSON.stringify(name),
+            "is registered and window." + name + " is not a function \u2014 rendering <" + name + "> as an unknown element."
+          );
+        }
+      }
+      return name;
+    }
+    function getError(url, name) {
+      const entry = cache.get(url);
+      if (entry?.error) return entry.error;
+      return reportedMissing.get(url + "\0" + name) || null;
+    }
+    return { load, resolve: resolve2, resolveGlobal, getError };
+  }
+  function isElementClass(g) {
+    try {
+      return typeof g === "function" && typeof HTMLElement !== "undefined" && g.prototype instanceof HTMLElement;
+    } catch {
+      return false;
+    }
+  }
+
+  // src/helmet.ts
+  function createHelmetManager(doc, isStreaming) {
+    const mounted = /* @__PURE__ */ new Set();
+    const live = /* @__PURE__ */ new Map();
+    function compile(node) {
+      const raw = [...node.children];
+      const helmetClosed = node.nextSibling != null || node.parentNode?.nextSibling != null;
+      return (_vals, ctx) => {
+        const name = ctx && ctx.__name || "";
+        const streaming = !!(name && isStreaming(name));
+        for (let i = 0; i < raw.length; i++) {
+          const child = raw[i];
+          const tag = child.tagName;
+          const mayBePartial = streaming && !helmetClosed && i === raw.length - 1;
+          if (tag === "SCRIPT") {
+            if (mayBePartial) continue;
+            const key = "SCRIPT|" + (child.getAttribute("src") || child.textContent || "");
+            if (mounted.has(key)) continue;
+            mounted.add(key);
+            const el = doc.createElement("script");
+            for (const { name: an, value } of [...child.attributes])
+              el.setAttribute(an, value);
+            if (child.textContent) el.textContent = child.textContent;
+            doc.head.appendChild(el);
+          } else if (tag === "LINK" || tag === "META") {
+            if (mayBePartial) continue;
+            const key = tag + "|" + (child.getAttribute("href") || child.getAttribute("src") || child.outerHTML);
+            if (mounted.has(key)) continue;
+            mounted.add(key);
+            doc.head.appendChild(child.cloneNode(true));
+          } else {
+            const key = name + "|" + i;
+            let el = live.get(key);
+            if (!el || el.tagName !== tag) {
+              if (el) el.remove();
+              el = doc.createElement(tag.toLowerCase());
+              live.set(key, el);
+              doc.head.appendChild(el);
+            }
+            for (const { name: an, value } of [...child.attributes]) {
+              if (el.getAttribute(an) !== value) el.setAttribute(an, value);
+            }
+            if (el.textContent !== child.textContent)
+              el.textContent = child.textContent;
+          }
+        }
+        return null;
+      };
+    }
+    return { compile };
+  }
+
+  // src/pseudo.ts
+  function createPseudoSheet(doc) {
+    let el = null;
+    const cache = /* @__PURE__ */ new Map();
+    let n = 0;
+    return (pseudo, css) => {
+      const k = pseudo + "|" + css;
+      const hit = cache.get(k);
+      if (hit) return hit;
+      if (!el) {
+        el = doc.createElement("style");
+        doc.head.appendChild(el);
+      }
+      const cls = "scp" + (n++).toString(36);
+      const sel = pseudo === "before" || pseudo === "after" ? "." + cls + "::" + pseudo : "." + cls + ":" + pseudo;
+      el.sheet.insertRule(sel + "{" + css + "}", el.sheet.cssRules.length);
+      cache.set(k, cls);
+      return cls;
+    };
+  }
+
+  // src/registry.ts
+  function createRegistry() {
+    const entries = /* @__PURE__ */ Object.create(null);
+    function get(name) {
+      return entries[name] || (entries[name] = {
+        html: "",
+        tpl: null,
+        Logic: null,
+        jsStreaming: false,
+        htmlStreaming: false,
+        ver: 0,
+        subs: /* @__PURE__ */ new Set(),
+        fetched: false
+      });
+    }
+    function bump(name) {
+      const r = get(name);
+      r.ver++;
+      for (const fn of r.subs) fn();
+    }
+    return {
+      entries,
+      get,
+      bump,
+      bumpAll() {
+        for (const n in entries) bump(n);
+      }
+    };
+  }
+
+  // src/runtime.ts
+  var COMPONENT_DIR = ".";
+  function createRuntime(doc = document) {
+    const registry = createRegistry();
+    const pseudoClass = createPseudoSheet(doc);
+    const helmet = createHelmetManager(
+      doc,
+      (name) => registry.get(name).htmlStreaming
+    );
+    const external = createExternalModules(() => registry.bumpAll());
+    const factory = createComponentFactory(registry, ensureFetched);
+    const host = {
+      component: (name) => factory.getDC(name),
+      placeholder: (props) => h(Placeholder, props),
+      helmet: (node) => helmet.compile(node),
+      loadExternal: (kind, url) => external.load(kind, url),
+      resolveExternal: (url, name) => external.resolve(url, name),
+      resolveExternalGlobal: (url, name) => external.resolveGlobal(url, name),
+      resolveExternalError: (url, name) => external.getError(url, name),
+      pseudoClass
+    };
+    function ensureFetched(name) {
+      const r = registry.get(name);
+      if (r.fetched) return;
+      r.fetched = true;
+      const url = COMPONENT_DIR + "/" + encodeURIComponent(name) + ".dc.html";
+      fetch(url).then((res) => {
+        if (!res.ok) {
+          console.error(
+            "[dc-runtime] sibling fetch for <" + name + "/> failed:",
+            url,
+            "returned",
+            res.status,
+            "\u2014 the reference renders as an empty placeholder."
+          );
+          return "";
+        }
+        return res.text();
+      }).then((t) => {
+        if (!t) return;
+        const parsed = parseDcText(t);
+        if (!parsed) {
+          console.error(
+            "[dc-runtime] sibling fetch for <" + name + "/>:",
+            url,
+            "has no <x-dc> block \u2014 not a Design Component."
+          );
+          return;
+        }
+        if (parsed.props) r.propsMeta = parsed.props;
+        if (parsed.preview) r.preview = parsed.preview;
+        if (parsed.template && !r.html) updateHtml(name, parsed.template);
+        if (parsed.js && !r.Logic) updateJs(name, parsed.js);
+      }).catch(
+        (e) => console.error(
+          "[dc-runtime] sibling fetch for <" + name + "/> threw:",
+          url,
+          e
+        )
+      );
+    }
+    function updateHtml(name, html) {
+      const r = registry.get(name);
+      r.html = html;
+      try {
+        r.tpl = compileTemplate(html, host);
+      } catch (e) {
+        console.error("[dc-runtime] template compile FAILED for", name, e);
+      }
+      registry.bump(name);
+    }
+    function updateJs(name, src) {
+      const r = registry.get(name);
+      const seq = r.jsSeq = (r.jsSeq || 0) + 1;
+      try {
+        const Cls = evalDcLogic(src);
+        if (r.jsSeq !== seq) return;
+        if (typeof Cls !== "function") {
+          r.logicError = name + ".dc.html: <script data-dc-script> must define `class Component extends DCLogic`";
+        } else {
+          r.logicError = null;
+          r.Logic = Cls;
+        }
+      } catch (e) {
+        if (r.jsSeq !== seq) return;
+        console.error(
+          "[dc-runtime] logic class eval FAILED for",
+          name,
+          "\u2014 the template renders with props only.",
+          e
+        );
+        r.logicError = name + ": " + (e instanceof Error && e.message ? e.message : String(e));
+      }
+      registry.bump(name);
+    }
+    function setStreaming(name, kind, on) {
+      const r = registry.get(name);
+      if (kind === "html") r.htmlStreaming = !!on;
+      else r.jsStreaming = !!on;
+      let any = false;
+      for (const n in registry.entries) {
+        const e = registry.entries[n];
+        if (e && (e.htmlStreaming || e.jsStreaming)) {
+          any = true;
+          break;
+        }
+      }
+      doc.documentElement.classList.toggle("sc-dc-streaming", any);
+      registry.bump(name);
+    }
+    function dcUpdate(name, kind, content, streaming) {
+      if (streaming) registry.get(name).fetched = true;
+      if (kind === "html") {
+        setStreaming(name, "html", !!streaming);
+        updateHtml(name, content);
+      } else if (kind === "js") {
+        setStreaming(name, "js", !!streaming);
+        if (!streaming) updateJs(name, content);
+      } else if (kind === "props") {
+        const { props, preview } = parseDataProps(content);
+        const r = registry.get(name);
+        r.propsMeta = props ?? void 0;
+        r.preview = preview;
+        registry.bump(name);
+      }
+    }
+    function setProps(name, overrides) {
+      registry.get(name).propOverrides = overrides && typeof overrides === "object" ? { ...overrides } : null;
+      registry.bump(name);
+    }
+    function adoptParsed(name, parsed) {
+      if (!parsed) return;
+      const r = registry.get(name);
+      if (parsed.props) r.propsMeta = parsed.props;
+      if (parsed.preview) r.preview = parsed.preview;
+      if (parsed.template) updateHtml(name, parsed.template);
+      if (parsed.js) updateJs(name, parsed.js);
+    }
+    return {
+      registry,
+      getDC: factory.getDC,
+      updateHtml,
+      updateJs,
+      dcUpdate,
+      setProps,
+      adoptParsed,
+      markFetched: (name) => {
+        registry.get(name).fetched = true;
+      },
+      annotatedTemplate: (name) => {
+        const r = registry.get(name);
+        return r.tpl && r.tpl.__annotated || null;
+      },
+      templateSource: (name) => registry.get(name).html || null,
+      StreamableLogic
+    };
+  }
+
+  // src/index.ts
+  var REACT_URL = "https://unpkg.com/react@18.3.1/umd/react.production.min.js";
+  var REACT_SRI = "sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z";
+  var REACT_DOM_URL = "https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js";
+  var REACT_DOM_SRI = "sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1";
+  function hideRawTemplate() {
+    const s = document.createElement("style");
+    s.textContent = "x-dc{display:none!important}";
+    document.head.appendChild(s);
+  }
+  function loadScript(src, integrity) {
+    return new Promise((resolve2, reject) => {
+      //! nosemgrep: create-script-element
+      const s = document.createElement("script");
+      s.src = src;
+      s.integrity = integrity;
+      s.crossOrigin = "anonymous";
+      s.async = false;
+      s.onload = () => resolve2();
+      s.onerror = () => reject(new Error(`failed to load ${src}`));
+      document.head.appendChild(s);
+    });
+  }
+  function loadReactUmd() {
+    const w = window;
+    if (w.React && w.ReactDOM) return Promise.resolve();
+    return Promise.all([
+      loadScript(REACT_URL, REACT_SRI),
+      loadScript(REACT_DOM_URL, REACT_DOM_SRI)
+    ]).then(() => void 0);
+  }
+  function init() {
+    const runtime = createRuntime(document);
+    let rootName = "Root";
+    const baseCss = document.createElement("style");
+    baseCss.textContent = BASE_CSS;
+    document.head.prepend(baseCss);
+    const notifyHost = () => {
+      if (window.parent === window) return;
+      const r = runtime.registry.entries[rootName];
+      try {
+        window.parent.postMessage(
+          {
+            type: "__dc_booted",
+            rootName,
+            propsMeta: r && r.propsMeta || null,
+            preview: r && r.preview || null
+          },
+          "*"
+        );
+      } catch {
+      }
+    };
+    const api = {
+      __dcUpdate: (name, kind, content, streaming) => {
+        runtime.dcUpdate(name, kind, content, streaming);
+        if (name === rootName && !streaming && kind === "props") notifyHost();
+      },
+      __dcSetProps: (name, overrides) => runtime.setProps(name, overrides),
+      /** Name of the component currently mounted as the page root — DC tools
+       *  push their template-stream here when targeting "the open page". */
+      __dcRootName: () => rootName,
+      /** Editor bridge — the encoded, `data-dc-tpl`-annotated template source.
+       *  The host editor parses this into its own template DOM so it can map a
+       *  rendered node (carrying the same `data-dc-tpl`) back to the source
+       *  node that emitted it. Returns the encoded form (`<sc-comp>`,
+       *  `sc-camel-*` attrs); the editor decodes on serialize. */
+      __dcAnnotatedTemplate: (name) => runtime.annotatedTemplate(name),
+      /** Editor bridge — the *original* (decoded) template source. */
+      __dcTemplateSource: (name) => runtime.templateSource(name),
+      __dcBoot: () => {
+        rootName = boot(runtime, document) ?? rootName;
+        notifyHost();
+      },
+      __dcRegistry: runtime.registry.entries,
+      getDC: (name) => runtime.getDC(name),
+      // `DCLogic` is the documented base class name; `StreamableLogic` is the
+      // implementation alias kept for any project that already references it.
+      DCLogic: runtime.StreamableLogic,
+      StreamableLogic: runtime.StreamableLogic
+    };
+    Object.assign(window, api);
+    if (document.readyState !== "loading") api.__dcBoot();
+    else document.addEventListener("DOMContentLoaded", () => api.__dcBoot());
+  }
+  hideRawTemplate();
+  loadReactUmd().then(init).catch((err) => {
+    console.error("[dc] failed to load React or boot:", err);
+    throw err;
+  });
+})();
+
+</script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:#eef1f3;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;color:#1b2227;-webkit-font-smoothing:antialiased;}
+  input,button,textarea{font-family:inherit;}
+  input[type=date]{font-family:inherit;}
+  @keyframes fk-spin{to{transform:rotate(360deg);}}
+  [data-printonly]{display:none;}
+  @media print{
+    body{background:#fff !important;}
+    [data-noprint]{display:none !important;}
+    [data-printonly]{display:block !important;}
+    [data-scroll]{overflow:visible !important;}
+    [data-app]{padding:0 !important;}
+    [data-sheet]{box-shadow:none !important;border:none !important;border-radius:0 !important;max-width:none !important;}
+    table{font-size:9.5px !important;}
+    td,th{border:1px solid #000 !important;}
+    @page{size:landscape;margin:10mm;}
+  }
+</style>
+</helmet>
+<div data-app="" style="min-height:100vh;padding:28px 22px 64px;">
+  <div data-sheet="" style="max-width:1320px;margin:0 auto;background:#ffffff;border:1px solid #dbe1e6;border-radius:10px;box-shadow:0 1px 3px rgba(20,40,60,.07);overflow:hidden;">
+
+    <!-- Header -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;padding:22px 26px;border-bottom:2px solid #2f6076;background:#f7fafb;">
+      <div>
+        <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#2f6076;font-weight:700;">Universitetssykehuset Nord-Norge HF · Klinisk Patologi</div>
+        <h1 style="margin:7px 0 4px;font-size:24px;font-weight:700;letter-spacing:-.01em;color:#16242c;">Farge reagenser – registrering av lot</h1>
+        <div style="font-size:12.5px;color:#5c6b73;">Histopatologiske metoder · Fagområde farging</div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div data-noprint="" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:16px 26px;border-bottom:1px solid #e7ecef;">
+      <button type="button" onClick="{{ openScan }}" style="display:inline-flex;align-items:center;gap:9px;background:#2f6076;color:#fff;border:none;border-radius:8px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 1px 2px rgba(20,40,60,.15);" style-hover="background:#26505f;">
+        <span style="font-size:17px;line-height:1;">⊕</span> Skann reagens (bilde)
+      </button>
+      <button type="button" onClick="{{ addRow }}" style="background:#fff;color:#2f6076;border:1px solid #b9c7cf;border-radius:8px;padding:11px 16px;font-size:14px;font-weight:600;cursor:pointer;" style-hover="background:#f1f6f8;">
+        + Legg til tom rad
+      </button>
+      <div style="width:1px;align-self:stretch;background:#e3e9ec;margin:2px 0;"></div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:12px;color:#7c8a91;font-weight:600;">Delt fil:</span>
+        <button type="button" onClick="{{ openFromFile }}" title="Åpne en felles .json-fil fra nettverksdisk" style="background:#fff;color:#3b4a52;border:1px solid #c7d0d6;border-radius:8px;padding:9px 13px;font-size:13px;font-weight:600;cursor:pointer;" style-hover="background:#f4f7f8;">Åpne fra fil</button>
+        <button type="button" onClick="{{ saveToFile }}" title="Lagre hele tabellen til den felles .json-filen" style="background:#fff;color:#3b4a52;border:1px solid #c7d0d6;border-radius:8px;padding:9px 13px;font-size:13px;font-weight:600;cursor:pointer;" style-hover="background:#f4f7f8;">Lagre til fil</button>
+        <sc-if value="{{ hasFile }}" hint-placeholder-val="{{ false }}">
+          <span title="Tilkoblet delt fil" style="font-size:12px;color:#2f6076;display:inline-flex;align-items:center;gap:5px;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span style="width:8px;height:8px;border-radius:50%;background:#3a8a5f;display:inline-block;flex:none;"></span>{{ fileName }}</span>
+        </sc-if>
+        <input id="fk-importinput" type="file" accept=".json,application/json" onChange="{{ onImportFile }}" style="display:none;" />
+      </div>
+      <div style="flex:1;"></div>
+      <div style="display:flex;gap:14px;align-items:center;font-size:12.5px;color:#5c6b73;margin-right:4px;">
+        <span><strong style="color:#1b2227;">{{ total }}</strong> rader</span>
+        <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:9px;height:9px;border-radius:50%;background:#cd8a00;display:inline-block;"></span>{{ soon }} snart</span>
+        <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:9px;height:9px;border-radius:50%;background:#c0392b;display:inline-block;"></span>{{ expired }} utløpt</span>
+      </div>
+      <button type="button" onClick="{{ exportCsv }}" style="background:#fff;color:#3b4a52;border:1px solid #c7d0d6;border-radius:8px;padding:11px 14px;font-size:13px;font-weight:600;cursor:pointer;" style-hover="background:#f4f7f8;">Eksporter CSV</button>
+      <button type="button" onClick="{{ printPage }}" style="background:#fff;color:#3b4a52;border:1px solid #c7d0d6;border-radius:8px;padding:11px 14px;font-size:13px;font-weight:600;cursor:pointer;" style-hover="background:#f4f7f8;">Skriv ut / PDF</button>
+      <button type="button" onClick="{{ openApiKey }}" title="Konfigurer Anthropic API-nøkkel for bildeavlesning" style="{{ apiKeyBtnStyle }}" style-hover="background:#f0f7f4;">⚙ API-nøkkel</button>
+    </div>
+
+    <!-- Print-only meta -->
+    <div data-printonly="" style="padding:8px 26px;font-size:11px;color:#000;">Farge reagenser – registrering av lot · Utskriftsdato: {{ today }}</div>
+
+    <!-- Table -->
+    <div data-scroll="" style="overflow-x:auto;padding:6px 18px 22px;">
+      <table style="width:100%;min-width:1180px;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="text-align:left;">
+            <th style="padding:10px 8px;border-bottom:2px solid #cdd6db;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5c6b73;font-weight:700;width:38px;">#</th>
+            <th style="padding:10px 8px;border-bottom:2px solid #cdd6db;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5c6b73;font-weight:700;min-width:170px;">Navn / reagens</th>
+            <th style="padding:10px 8px;border-bottom:2px solid #cdd6db;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5c6b73;font-weight:700;min-width:150px;">Oppbevaring</th>
+            <th style="padding:10px 8px;border-bottom:2px solid #cdd6db;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5c6b73;font-weight:700;width:104px;">Ventana nr.</th>
+            <th style="padding:10px 8px;border-bottom:2px solid #cdd6db;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5c6b73;font-weight:700;width:120px;">Lotnummer</th>
+            <th style="padding:10px 8px;border-bottom:2px solid #cdd6db;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5c6b73;font-weight:700;width:140px;">Utgår dato</th>
+            <th style="padding:10px 8px;border-bottom:2px solid #cdd6db;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5c6b73;font-weight:700;min-width:150px;">Mottatt dato og sign.</th>
+            <th style="padding:10px 8px;border-bottom:2px solid #cdd6db;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5c6b73;font-weight:700;min-width:150px;">Tatt i bruk, dato og sign.</th>
+            <th style="padding:10px 8px;border-bottom:2px solid #cdd6db;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5c6b73;font-weight:700;min-width:160px;">Kommentar</th>
+            <th data-noprint="" style="padding:10px 8px;border-bottom:2px solid #cdd6db;width:34px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <sc-for list="{{ rows }}" as="row" hint-placeholder-count="0">
+            <tr style="{{ row.rowStyle }}">
+              <td style="padding:9px 8px;border-bottom:1px solid #eef2f4;vertical-align:top;">
+                <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding-top:6px;">
+                  <span style="font-size:12px;color:#8a979e;font-weight:600;">{{ row.num }}</span>
+                  <span title="{{ row.statusLabel }}" style="{{ row.dotStyle }}"></span>
+                </div>
+              </td>
+              <td style="padding:5px 6px;border-bottom:1px solid #eef2f4;vertical-align:top;">
+                <input type="text" value="{{ row.navn }}" onInput="{{ row.onNavn }}" placeholder="f.eks. anti-CD20" style="width:100%;border:1px solid transparent;background:transparent;font:inherit;font-size:13px;color:#1b2227;padding:7px 8px;border-radius:5px;box-sizing:border-box;" style-focus="border-color:#2f6076;background:#fff;outline:none;" />
+              </td>
+              <td style="padding:5px 6px;border-bottom:1px solid #eef2f4;vertical-align:top;">
+                <div data-noprint="" style="display:flex;gap:5px;padding-top:3px;">
+                  <button type="button" onClick="{{ row.onKjol }}" style="{{ row.kjolStyle }}">Kjøleskap</button>
+                  <button type="button" onClick="{{ row.onRom }}" style="{{ row.romStyle }}">Romtemp.</button>
+                </div>
+                <div data-printonly="" style="font-size:11px;">{{ row.storageLabel }}</div>
+              </td>
+              <td style="padding:5px 6px;border-bottom:1px solid #eef2f4;vertical-align:top;">
+                <input type="text" value="{{ row.ventana }}" onInput="{{ row.onVentana }}" style="width:100%;border:1px solid transparent;background:transparent;font:inherit;font-size:13px;color:#1b2227;padding:7px 8px;border-radius:5px;box-sizing:border-box;" style-focus="border-color:#2f6076;background:#fff;outline:none;" />
+              </td>
+              <td style="padding:5px 6px;border-bottom:1px solid #eef2f4;vertical-align:top;">
+                <input type="text" value="{{ row.lot }}" onInput="{{ row.onLot }}" style="width:100%;border:1px solid transparent;background:transparent;font:inherit;font-size:13px;font-variant-numeric:tabular-nums;color:#1b2227;padding:7px 8px;border-radius:5px;box-sizing:border-box;" style-focus="border-color:#2f6076;background:#fff;outline:none;" />
+              </td>
+              <td style="padding:5px 6px;border-bottom:1px solid #eef2f4;vertical-align:top;">
+                <input type="date" value="{{ row.exp }}" onInput="{{ row.onExp }}" style="width:100%;border:1px solid transparent;background:transparent;font:inherit;font-size:12.5px;color:#1b2227;padding:6px 6px;border-radius:5px;box-sizing:border-box;" style-focus="border-color:#2f6076;background:#fff;outline:none;" />
+              </td>
+              <td style="padding:5px 6px;border-bottom:1px solid #eef2f4;vertical-align:top;">
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                  <input type="date" value="{{ row.mDato }}" onInput="{{ row.onMDato }}" style="width:100%;border:1px solid transparent;background:transparent;font:inherit;font-size:12.5px;color:#1b2227;padding:6px 6px;border-radius:5px;box-sizing:border-box;" style-focus="border-color:#2f6076;background:#fff;outline:none;" />
+                  <input type="text" value="{{ row.mSign }}" onInput="{{ row.onMSign }}" placeholder="sign." style="width:100%;border:1px solid transparent;background:transparent;font:inherit;font-size:12px;color:#5c6b73;padding:5px 8px;border-radius:5px;box-sizing:border-box;" style-focus="border-color:#2f6076;background:#fff;outline:none;color:#1b2227;" />
+                </div>
+              </td>
+              <td style="padding:5px 6px;border-bottom:1px solid #eef2f4;vertical-align:top;">
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                  <input type="date" value="{{ row.tDato }}" onInput="{{ row.onTDato }}" style="width:100%;border:1px solid transparent;background:transparent;font:inherit;font-size:12.5px;color:#1b2227;padding:6px 6px;border-radius:5px;box-sizing:border-box;" style-focus="border-color:#2f6076;background:#fff;outline:none;" />
+                  <input type="text" value="{{ row.tSign }}" onInput="{{ row.onTSign }}" placeholder="sign." style="width:100%;border:1px solid transparent;background:transparent;font:inherit;font-size:12px;color:#5c6b73;padding:5px 8px;border-radius:5px;box-sizing:border-box;" style-focus="border-color:#2f6076;background:#fff;outline:none;color:#1b2227;" />
+                </div>
+              </td>
+              <td style="padding:5px 6px;border-bottom:1px solid #eef2f4;vertical-align:top;">
+                <input type="text" value="{{ row.komm }}" onInput="{{ row.onKomm }}" style="width:100%;border:1px solid transparent;background:transparent;font:inherit;font-size:13px;color:#1b2227;padding:7px 8px;border-radius:5px;box-sizing:border-box;" style-focus="border-color:#2f6076;background:#fff;outline:none;" />
+              </td>
+              <td data-noprint="" style="padding:5px 4px;border-bottom:1px solid #eef2f4;vertical-align:top;text-align:center;">
+                <button type="button" onClick="{{ row.onDel }}" title="Slett rad" style="background:transparent;border:none;color:#b9c2c8;font-size:16px;cursor:pointer;padding:8px 4px;border-radius:5px;line-height:1;" style-hover="background:#fbeceb;color:#c0392b;">✕</button>
+              </td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+
+      <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+        <div data-noprint="" style="text-align:center;padding:48px 20px 36px;color:#7c8a91;">
+          <div style="font-size:40px;margin-bottom:10px;opacity:.5;">⊞</div>
+          <div style="font-size:15px;font-weight:600;color:#52636b;margin-bottom:5px;">Ingen reagenser registrert ennå</div>
+          <div style="font-size:13px;">Trykk <strong style="color:#2f6076;">Skann reagens</strong> for å lese av en etikett med kamera, eller legg til en tom rad.</div>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+
+  <!-- Scan modal -->
+  <sc-if value="{{ scanOpen }}" hint-placeholder-val="{{ false }}">
+    <div data-noprint="" onClick="{{ closeScan }}" style="position:fixed;inset:0;background:rgba(18,30,38,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:50;">
+      <div onClick="{{ stop }}" style="background:#fff;border-radius:14px;width:520px;max-width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(10,25,35,.4);">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid #eceff1;">
+          <div>
+            <div style="font-size:16px;font-weight:700;color:#16242c;">Skann reagens</div>
+            <div style="font-size:12.5px;color:#7c8a91;margin-top:2px;">Navn, lot og utløpsdato leses av automatisk</div>
+          </div>
+          <button type="button" onClick="{{ closeScan }}" style="background:#f1f4f6;border:none;width:32px;height:32px;border-radius:8px;font-size:16px;color:#52636b;cursor:pointer;">✕</button>
+        </div>
+        <div style="padding:20px 22px;">
+
+          <!-- No API key warning -->
+          <sc-if value="{{ noApiKey }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#fdf6e6;border:1px solid #f0d888;border-radius:10px;padding:14px 16px;margin-bottom:16px;">
+              <div style="font-size:13px;font-weight:700;color:#7a5800;margin-bottom:4px;">API-nøkkel ikke konfigurert</div>
+              <div style="font-size:12.5px;color:#8a6300;margin-bottom:10px;">For automatisk avlesning trengs en Anthropic API-nøkkel. Lukk denne dialogen og trykk «⚙ API-nøkkel» i verktøylinjen.</div>
+              <button type="button" onClick="{{ openApiKeyFromScan }}" style="background:#2f6076;color:#fff;border:none;border-radius:7px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">Åpne API-nøkkel innstillinger</button>
+            </div>
+          </sc-if>
+
+          <!-- Tabs -->
+          <sc-if value="{{ noCapture }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;gap:6px;background:#f1f4f6;padding:4px;border-radius:9px;margin-bottom:18px;">
+              <button type="button" onClick="{{ tabUpload }}" style="{{ tabUploadStyle }}">Last opp bilde</button>
+              <button type="button" onClick="{{ tabCamera }}" style="{{ tabCameraStyle }}">Ta bilde (kamera)</button>
+            </div>
+          </sc-if>
+
+          <!-- Upload -->
+          <sc-if value="{{ showUpload }}" hint-placeholder-val="{{ false }}">
+            <label onDragOver="{{ onDragOver }}" onDrop="{{ onDrop }}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:2px dashed #c2cdd3;border-radius:12px;padding:38px 20px;text-align:center;cursor:pointer;background:#fafcfd;" style-hover="border-color:#2f6076;background:#f3f8fa;">
+              <div style="font-size:34px;opacity:.5;">⬆</div>
+              <div style="font-size:14px;font-weight:600;color:#3b4a52;">Dra bildet hit, eller klikk for å velge</div>
+              <div style="font-size:12px;color:#8a979e;">Foto av reagensetiketten (JPG/PNG)</div>
+              <input type="file" accept="image/*" onChange="{{ onFile }}" style="display:none;" />
+            </label>
+          </sc-if>
+
+          <!-- Camera -->
+          <sc-if value="{{ showCamera }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <div style="position:relative;border-radius:12px;overflow:hidden;background:#0d1418;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;">
+                <video id="scanvideo" playsinline="true" muted="true" style="width:100%;height:100%;object-fit:cover;"></video>
+                <sc-if value="{{ cameraIdle }}" hint-placeholder-val="{{ true }}">
+                  <button type="button" onClick="{{ startCamera }}" style="position:absolute;background:#fff;color:#16242c;border:none;border-radius:8px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer;">Start kamera</button>
+                </sc-if>
+              </div>
+              <sc-if value="{{ cameraActive }}" hint-placeholder-val="{{ false }}">
+                <button type="button" onClick="{{ capturePhoto }}" style="width:100%;margin-top:12px;background:#2f6076;color:#fff;border:none;border-radius:9px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;">Ta bilde</button>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <!-- Preview + OCR -->
+          <sc-if value="{{ hasCapture }}" hint-placeholder-val="{{ false }}">
+            <div>
+              {{ previewImg }}
+              <sc-if value="{{ scanError }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:12px;background:#fbeceb;color:#a5342a;border-radius:8px;padding:10px 12px;font-size:13px;">{{ scanError }}</div>
+              </sc-if>
+              <div style="display:flex;gap:10px;margin-top:14px;">
+                <button type="button" onClick="{{ retake }}" style="flex:0 0 auto;background:#fff;color:#3b4a52;border:1px solid #c7d0d6;border-radius:9px;padding:12px 16px;font-size:14px;font-weight:600;cursor:pointer;">Ta nytt</button>
+                <button type="button" onClick="{{ runOCR }}" style="flex:1;background:#2f6076;color:#fff;border:none;border-radius:9px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;">Les av med AI</button>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- Scanning spinner -->
+          <sc-if value="{{ scanning }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:12px;padding:26px 0 6px;">
+              <div style="width:30px;height:30px;border:3px solid #d8e1e6;border-top-color:#2f6076;border-radius:50%;animation:fk-spin .8s linear infinite;"></div>
+              <div style="font-size:13.5px;color:#52636b;font-weight:600;">Leser av etiketten …</div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ scanErrorNoCap }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:14px;background:#fdf6e6;color:#8a6300;border-radius:8px;padding:10px 12px;font-size:13px;">{{ scanError }}</div>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- API key modal -->
+  <sc-if value="{{ apiKeyOpen }}" hint-placeholder-val="{{ false }}">
+    <div data-noprint="" onClick="{{ closeApiKey }}" style="position:fixed;inset:0;background:rgba(18,30,38,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:50;">
+      <div onClick="{{ stop }}" style="background:#fff;border-radius:14px;width:460px;max-width:100%;box-shadow:0 20px 60px rgba(10,25,35,.4);">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid #eceff1;">
+          <div style="font-size:16px;font-weight:700;color:#16242c;">API-nøkkel for bildeavlesning</div>
+          <button type="button" onClick="{{ closeApiKey }}" style="background:#f1f4f6;border:none;width:32px;height:32px;border-radius:8px;font-size:16px;color:#52636b;cursor:pointer;">✕</button>
+        </div>
+        <div style="padding:20px 22px;">
+          <div style="font-size:13px;color:#5c6b73;margin-bottom:14px;line-height:1.55;">Legg inn en Anthropic API-nøkkel for å aktivere automatisk avlesning av reagensetiketter. Nøkkelen lagres lokalt i nettleseren og sendes til Anthropic ved skanning.</div>
+          <label style="display:block;font-size:11px;font-weight:700;color:#3b4a52;margin-bottom:6px;letter-spacing:.06em;text-transform:uppercase;">Anthropic API-nøkkel</label>
+          <input type="password" value="{{ apiKeyInput }}" onInput="{{ onApiKeyInput }}" placeholder="sk-ant-..." style="width:100%;border:1px solid #c7d0d6;border-radius:8px;padding:10px 12px;font-size:13px;font-family:ui-monospace,monospace;color:#1b2227;outline:none;box-sizing:border-box;" style-focus="border-color:#2f6076;outline:none;" />
+          <sc-if value="{{ hasStoredKey }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:8px;font-size:12px;color:#3a8a5f;display:flex;align-items:center;gap:5px;"><span style="width:7px;height:7px;border-radius:50%;background:#3a8a5f;display:inline-block;flex:none;"></span>Nøkkel lagret i nettleseren</div>
+          </sc-if>
+          <div style="display:flex;gap:8px;margin-top:16px;align-items:center;">
+            <button type="button" onClick="{{ clearApiKey }}" style="background:#fff;color:#b0392b;border:1px solid #e8c0bc;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;" style-hover="background:#fbeceb;">Fjern nøkkel</button>
+            <div style="flex:1;"></div>
+            <button type="button" onClick="{{ closeApiKey }}" style="background:#fff;color:#3b4a52;border:1px solid #c7d0d6;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;" style-hover="background:#f4f7f8;">Avbryt</button>
+            <button type="button" onClick="{{ saveApiKey }}" style="background:#2f6076;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:600;cursor:pointer;" style-hover="background:#26505f;">Lagre</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    rows: [],
+    scanOpen: false,
+    scanTab: 'upload',
+    captured: null,
+    scanning: false,
+    scanError: '',
+    cameraActive: false,
+    loaded: false,
+    fileName: '',
+    apiKeyOpen: false,
+    apiKeyInput: '',
+  };
+
+  KEY = 'fargekit_rows_v1';
+  API_KEY = 'fk_anthropic_key';
+
+  componentDidMount() {
+    try {
+      const raw = localStorage.getItem(this.KEY);
+      const rows = raw ? JSON.parse(raw) : [];
+      this.setState({ rows: Array.isArray(rows) ? rows : [], loaded: true });
+    } catch (e) {
+      this.setState({ loaded: true });
+    }
+  }
+
+  today() { return new Date().toISOString().slice(0, 10); }
+  genId() { return Date.now() + '-' + Math.random().toString(36).slice(2, 7); }
+
+  emptyRow(extra) {
+    return Object.assign({
+      id: this.genId(), navn: '', storage: 'kjol', ventana: '',
+      lot: '', exp: '', mDato: '', mSign: '', tDato: '', tSign: '', komm: '', _new: false,
+    }, extra || {});
+  }
+
+  persist(rows) {
+    try { localStorage.setItem(this.KEY, JSON.stringify(rows.map(r => { const c = Object.assign({}, r); delete c._new; return c; }))); } catch (e) {}
+  }
+
+  update(id, field, val) {
+    this.setState(s => {
+      const rows = s.rows.map(r => r.id === id ? Object.assign({}, r, { [field]: val }) : r);
+      this.persist(rows);
+      return { rows };
+    });
+  }
+
+  addRow(extra, highlight) {
+    this.setState(s => {
+      const rows = s.rows.concat([this.emptyRow(Object.assign({ _new: !!highlight }, extra || {}))]);
+      this.persist(rows);
+      return { rows };
+    });
+    if (highlight) {
+      clearTimeout(this._hl);
+      this._hl = setTimeout(() => this.setState(s => ({ rows: s.rows.map(r => Object.assign({}, r, { _new: false })) })), 3500);
+    }
+  }
+
+  removeRow(id) {
+    this.setState(s => {
+      const rows = s.rows.filter(r => r.id !== id);
+      this.persist(rows);
+      return { rows };
+    });
+  }
+
+  expStatus(exp) {
+    if (!exp) return { dot: '#cdd6db', label: 'Ingen utløpsdato', tint: '' };
+    const d = new Date(exp + 'T00:00:00');
+    const now = new Date(this.today() + 'T00:00:00');
+    const diff = (d - now) / 86400000;
+    if (isNaN(diff)) return { dot: '#cdd6db', label: '', tint: '' };
+    if (diff < 0) return { dot: '#c0392b', label: 'Utløpt', tint: '#fbeceb' };
+    if (diff <= 30) return { dot: '#cd8a00', label: 'Utløper snart', tint: '#fdf7e9' };
+    return { dot: '#3a8a5f', label: 'Gyldig', tint: '' };
+  }
+
+  // ---- scanning ----
+  openScan = () => this.setState({ scanOpen: true, scanTab: 'upload', captured: null, scanError: '', cameraActive: false });
+  closeScan = () => { this.stopCamera(); this.setState({ scanOpen: false, captured: null, scanError: '', cameraActive: false, scanning: false }); };
+  stopCamera() { if (this._stream) { this._stream.getTracks().forEach(t => t.stop()); this._stream = null; } }
+  tabUpload = () => { this.stopCamera(); this.setState({ scanTab: 'upload', cameraActive: false, scanError: '' }); };
+  tabCamera = () => this.setState({ scanTab: 'camera', scanError: '' });
+
+  startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } });
+      this._stream = stream;
+      const v = document.getElementById('scanvideo');
+      if (v) { v.srcObject = stream; try { await v.play(); } catch (e) {} }
+      this.setState({ cameraActive: true, scanError: '' });
+    } catch (e) {
+      this.setState({ scanError: 'Kamera er ikke tilgjengelig her. Bruk «Last opp bilde» i stedet.' });
+    }
+  };
+
+  capturePhoto = () => {
+    const v = document.getElementById('scanvideo');
+    if (!v) return;
+    const c = document.createElement('canvas');
+    c.width = v.videoWidth || 1024; c.height = v.videoHeight || 768;
+    c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+    this.stopCamera();
+    this.setState({ captured: c.toDataURL('image/jpeg', 0.85), cameraActive: false });
+  };
+
+  onFile = (e) => { const f = e.target.files && e.target.files[0]; this.readFileBlob(f); e.target.value = ''; };
+  onDragOver = (e) => { e.preventDefault(); };
+  onDrop = (e) => { e.preventDefault(); this.readFileBlob(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]); };
+
+  readFileBlob(f) {
+    if (!f || !/^image\//.test(f.type)) { this.setState({ scanError: 'Velg en bildefil.' }); return; }
+    const fr = new FileReader();
+    fr.onload = () => this.setState({ captured: fr.result, scanError: '' });
+    fr.readAsDataURL(f);
+  }
+
+  retake = () => this.setState({ captured: null, scanError: '' });
+
+  parseJson(txt) {
+    if (!txt) return {};
+    let t = String(txt).replace(/```json/gi, '').replace(/```/g, '').trim();
+    const a = t.indexOf('{'), b = t.lastIndexOf('}');
+    if (a >= 0 && b > a) t = t.slice(a, b + 1);
+    try { return JSON.parse(t); } catch (e) { return {}; }
+  }
+
+  normDate(s) {
+    if (!s) return '';
+    s = String(s).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    return '';
+  }
+
+  runOCR = async () => {
+    if (!this.state.captured) return;
+    const apiKey = localStorage.getItem(this.API_KEY);
+    if (!apiKey) {
+      this.setState({ scanError: 'API-nøkkel mangler. Lukk og trykk «⚙ API-nøkkel» i verktøylinjen.' });
+      return;
+    }
+    this.setState({ scanning: true, scanError: '' });
+    const prompt = 'Du ser et foto av en etikett på et histologi-/patologireagens (ofte Ventana/Roche). '
+      + 'Les av feltene og svar KUN med gyldig JSON, ingen forklaring eller markdown. '
+      + 'Felter: "reagens" (produktnavn/antistoff, f.eks. anti-CD20 (L26)), "lot" (lotnummer, ofte merket LOT), '
+      + '"utgaar" (utløpsdato/EXP, format YYYY-MM-DD hvis mulig), "ventana" (Ventana-/katalognummer hvis synlig, ellers tom streng), '
+      + '"oppbevaring" ("kjol" hvis etiketten indikerer kjøleoppbevaring som 2-8°C eller "store refrigerated", ellers "rom"). '
+      + 'Bruk tom streng for felt du ikke finner. Svar: {"reagens":"","lot":"","utgaar":"","ventana":"","oppbevaring":""}';
+    try {
+      const m = this.state.captured.match(/^data:(image\/[\w.+-]+);base64,(.+)$/);
+      const media = m ? m[1] : 'image/jpeg';
+      const data = m ? m[2] : this.state.captured.replace(/^data:[^,]+,/, '');
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-request-in-browser': 'true',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 512,
+          messages: [{ role: 'user', content: [
+            { type: 'image', source: { type: 'base64', media_type: media, data } },
+            { type: 'text', text: prompt },
+          ]}],
+        }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error((err.error && err.error.message) || 'HTTP ' + resp.status);
+      }
+      const respData = await resp.json();
+      const j = this.parseJson(respData.content[0].text);
+      const exp = this.normDate(j.utgaar);
+      this.addRow({
+        navn: j.reagens || '',
+        lot: j.lot || '',
+        exp,
+        ventana: j.ventana || '',
+        storage: j.oppbevaring === 'rom' ? 'rom' : 'kjol',
+        mDato: this.today(),
+        komm: (j.utgaar && !exp) ? 'Utløp lest av bilde: ' + j.utgaar : '',
+      }, true);
+      this.setState({ scanning: false, scanOpen: false, captured: null });
+      this.stopCamera();
+    } catch (e) {
+      this.setState({ scanning: false, scanError: 'Kunne ikke lese bildet: ' + (e.message || 'ukjent feil') + '. Prøv et tydeligere bilde, eller fyll inn manuelt.' });
+    }
+  };
+
+  // ---- API key ----
+  openApiKey = () => this.setState({ apiKeyOpen: true, apiKeyInput: localStorage.getItem(this.API_KEY) || '' });
+  closeApiKey = () => this.setState({ apiKeyOpen: false });
+  openApiKeyFromScan = () => { this.closeScan(); this.openApiKey(); };
+  onApiKeyInput = e => this.setState({ apiKeyInput: e.target.value });
+  saveApiKey = () => {
+    const key = this.state.apiKeyInput.trim();
+    if (key) localStorage.setItem(this.API_KEY, key);
+    else localStorage.removeItem(this.API_KEY);
+    this.setState({ apiKeyOpen: false });
+  };
+  clearApiKey = () => { localStorage.removeItem(this.API_KEY); this.setState({ apiKeyInput: '' }); };
+
+  // ---- shared file ----
+  buildJson() {
+    const clean = this.state.rows.map(r => { const c = Object.assign({}, r); delete c._new; return c; });
+    return JSON.stringify({ app: 'farge-reagenser', savedAt: new Date().toISOString(), rows: clean }, null, 2);
+  }
+
+  loadJson(txt, name) {
+    let data;
+    try { data = JSON.parse(txt); } catch (e) { alert('Fant ikke gyldig data i filen.'); return; }
+    const rows = Array.isArray(data) ? data : (data && Array.isArray(data.rows) ? data.rows : null);
+    if (!rows) { alert('Filen inneholder ingen reagensliste.'); return; }
+    if (this.state.rows.length > 0 && !confirm('Dette erstatter den lokale listen med innholdet fra filen. Fortsette?')) return;
+    const norm = rows.map(r => this.emptyRow({
+      navn: r.navn || '', storage: r.storage === 'rom' ? 'rom' : 'kjol', ventana: r.ventana || '',
+      lot: r.lot || '', exp: r.exp || '', mDato: r.mDato || '', mSign: r.mSign || '',
+      tDato: r.tDato || '', tSign: r.tSign || '', komm: r.komm || '',
+    }));
+    this.persist(norm);
+    this.setState({ rows: norm, fileName: name || this.state.fileName });
+  }
+
+  saveToFile = async () => {
+    const json = this.buildJson();
+    try {
+      if (this._fileHandle && this._fileHandle.createWritable) {
+        const w = await this._fileHandle.createWritable();
+        await w.write(json); await w.close(); return;
+      }
+      if (window.showSaveFilePicker) {
+        const h = await window.showSaveFilePicker({ suggestedName: 'farge-reagenser.json', types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }] });
+        this._fileHandle = h;
+        const w = await h.createWritable();
+        await w.write(json); await w.close();
+        this.setState({ fileName: h.name }); return;
+      }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+    const blob = new Blob([json], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'farge-reagenser.json';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  };
+
+  openFromFile = async () => {
+    try {
+      if (window.showOpenFilePicker) {
+        const [h] = await window.showOpenFilePicker({ types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }] });
+        this._fileHandle = h;
+        const f = await h.getFile();
+        this.loadJson(await f.text(), h.name); return;
+      }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+    const inp = document.getElementById('fk-importinput');
+    if (inp) inp.click();
+  };
+
+  onImportFile = (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    const fr = new FileReader();
+    fr.onload = () => this.loadJson(fr.result, f.name);
+    fr.readAsText(f);
+  };
+
+  // ---- export ----
+  exportCsv = () => {
+    const head = ['Navn/reagens','Oppbevaring','Ventana nr.','Lotnummer','Utgår dato','Mottatt dato','Mottatt sign.','Tatt i bruk dato','Tatt i bruk sign.','Kommentar'];
+    const esc = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const lines = [head.map(esc).join(';')];
+    this.state.rows.forEach(r => {
+      lines.push([r.navn, r.storage === 'kjol' ? 'Kjøleskap' : 'Romtemperatur', r.ventana, r.lot, r.exp, r.mDato, r.mSign, r.tDato, r.tSign, r.komm].map(esc).join(';'));
+    });
+    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'fargekit-registrering-' + this.today() + '.csv';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  };
+
+  printPage = () => window.print();
+  stop = (e) => { e.stopPropagation(); };
+
+  renderVals() {
+    const segBase = 'font:inherit;font-size:11px;padding:6px 9px;border-radius:999px;border:1px solid #c2ccd2;cursor:pointer;white-space:nowrap;line-height:1;';
+    const segOn  = 'background:#2f6076;color:#fff;border-color:#2f6076;';
+    const segOff = 'background:#fff;color:#5c6b73;';
+    const tabBase = 'flex:1;font:inherit;font-size:13px;font-weight:600;padding:9px;border-radius:7px;border:none;cursor:pointer;';
+    const tabOn  = 'background:#fff;color:#16242c;box-shadow:0 1px 2px rgba(20,40,60,.12);';
+    const tabOff = 'background:transparent;color:#7c8a91;';
+
+    const rows = this.state.rows.map((r, i) => {
+      const st = this.expStatus(r.exp);
+      const bg = r._new ? 'background:#e7f4ec;' : (st.tint ? 'background:' + st.tint + ';' : (i % 2 ? 'background:#fbfcfd;' : 'background:#ffffff;'));
+      return Object.assign({}, r, {
+        num: i + 1,
+        rowStyle: 'transition:background .3s;' + bg,
+        statusLabel: st.label,
+        storageLabel: r.storage === 'kjol' ? 'Kjøleskap' : 'Romtemperatur',
+        dotStyle: 'width:9px;height:9px;border-radius:50%;display:inline-block;background:' + st.dot + ';',
+        kjolStyle: segBase + (r.storage === 'kjol' ? segOn : segOff),
+        romStyle:  segBase + (r.storage === 'rom'  ? segOn : segOff),
+        onNavn:   e => this.update(r.id, 'navn',   e.target.value),
+        onVentana:e => this.update(r.id, 'ventana',e.target.value),
+        onLot:    e => this.update(r.id, 'lot',    e.target.value),
+        onExp:    e => this.update(r.id, 'exp',    e.target.value),
+        onMDato:  e => this.update(r.id, 'mDato',  e.target.value),
+        onMSign:  e => this.update(r.id, 'mSign',  e.target.value),
+        onTDato:  e => this.update(r.id, 'tDato',  e.target.value),
+        onTSign:  e => this.update(r.id, 'tSign',  e.target.value),
+        onKomm:   e => this.update(r.id, 'komm',   e.target.value),
+        onKjol: () => this.update(r.id, 'storage', 'kjol'),
+        onRom:  () => this.update(r.id, 'storage', 'rom'),
+        onDel:  () => this.removeRow(r.id),
+      });
+    });
+
+    const expired = this.state.rows.filter(r => this.expStatus(r.exp).label === 'Utløpt').length;
+    const soon    = this.state.rows.filter(r => this.expStatus(r.exp).label === 'Utløper snart').length;
+    const hasCapture = !!this.state.captured && !this.state.scanning;
+    const storedKey  = localStorage.getItem(this.API_KEY) || '';
+
+    return {
+      rows,
+      total: this.state.rows.length,
+      expired, soon,
+      today: this.today(),
+      isEmpty: this.state.loaded && this.state.rows.length === 0,
+      scanOpen: this.state.scanOpen,
+      scanning: this.state.scanning,
+      previewImg: this.state.captured
+        ? React.createElement('img', { src: this.state.captured, alt: 'forhåndsvisning', style: { width:'100%', borderRadius:'12px', border:'1px solid #e3e8eb', maxHeight:'300px', objectFit:'contain', background:'#f6f8f9' } })
+        : null,
+      scanError: this.state.scanError,
+      cameraActive: this.state.cameraActive,
+      cameraIdle: this.state.scanTab === 'camera' && !this.state.cameraActive && !this.state.captured,
+      noCapture: !this.state.captured && !this.state.scanning,
+      showUpload: this.state.scanTab === 'upload' && !this.state.captured && !this.state.scanning,
+      showCamera: this.state.scanTab === 'camera' && !this.state.captured && !this.state.scanning,
+      hasCapture,
+      noApiKey: !storedKey,
+      scanErrorNoCap: !!this.state.scanError && !this.state.captured && !this.state.scanning,
+      tabUploadStyle: tabBase + (this.state.scanTab === 'upload' ? tabOn : tabOff),
+      tabCameraStyle: tabBase + (this.state.scanTab === 'camera' ? tabOn : tabOff),
+      openScan: this.openScan,
+      closeScan: this.closeScan,
+      stop: this.stop,
+      tabUpload: this.tabUpload,
+      tabCamera: this.tabCamera,
+      startCamera: this.startCamera,
+      capturePhoto: this.capturePhoto,
+      onFile: this.onFile,
+      onDragOver: this.onDragOver,
+      onDrop: this.onDrop,
+      retake: this.retake,
+      runOCR: this.runOCR,
+      exportCsv: this.exportCsv,
+      printPage: this.printPage,
+      addRow: () => this.addRow(),
+      saveToFile: this.saveToFile,
+      openFromFile: this.openFromFile,
+      onImportFile: this.onImportFile,
+      fileName: this.state.fileName,
+      hasFile: !!this.state.fileName,
+      // API key
+      apiKeyOpen: this.state.apiKeyOpen,
+      apiKeyInput: this.state.apiKeyInput,
+      openApiKey: this.openApiKey,
+      closeApiKey: this.closeApiKey,
+      openApiKeyFromScan: this.openApiKeyFromScan,
+      onApiKeyInput: this.onApiKeyInput,
+      saveApiKey: this.saveApiKey,
+      clearApiKey: this.clearApiKey,
+      hasStoredKey: !!storedKey,
+      apiKeyBtnStyle: 'background:#fff;color:' + (storedKey ? '#2a7a52' : '#7c8a91') + ';border:1px solid ' + (storedKey ? '#b0dac0' : '#c7d0d6') + ';border-radius:8px;padding:11px 14px;font-size:13px;font-weight:600;cursor:pointer;',
+    };
+  }
+}
+</script>
+</body>
+</html>
