@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Farge reagenser – registrering av lot</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon.svg">
+<meta name="theme-color" content="#2f6076">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fargekit">
+<style>
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{background:#eef1f3;font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;color:#1b2227;-webkit-font-smoothing:antialiased;}
+input,button,textarea{font-family:inherit;}
+.noprint{}
+.printonly{display:none;}
+@media print{
+  body{background:#fff!important;}
+  .noprint{display:none!important;}
+  .printonly{display:block!important;}
+  #app{padding:0!important;}
+  #sheet{box-shadow:none!important;border:none!important;border-radius:0!important;max-width:none!important;}
+  .scroll-x{overflow:visible!important;}
+  table{font-size:9.5px!important;}
+  td,th{border:1px solid #000!important;}
+  @page{size:landscape;margin:10mm;}
+}
+.cell-input{width:100%;border:1px solid transparent;background:transparent;font:inherit;font-size:13px;color:#1b2227;padding:7px 8px;border-radius:5px;}
+.cell-input:focus{border-color:#2f6076;background:#fff;outline:none;}
+.date-input{width:100%;border:1px solid transparent;background:transparent;font:inherit;font-size:12.5px;color:#1b2227;padding:6px;border-radius:5px;}
+.date-input:focus{border-color:#2f6076;background:#fff;outline:none;}
+.sign-input{width:100%;border:1px solid transparent;background:transparent;font:inherit;font-size:12px;color:#5c6b73;padding:5px 8px;border-radius:5px;}
+.sign-input:focus{border-color:#2f6076;background:#fff;outline:none;color:#1b2227;}
+.seg-btn{font:inherit;font-size:11px;padding:6px 9px;border-radius:999px;border:1px solid #c2ccd2;cursor:pointer;white-space:nowrap;line-height:1;}
+.seg-btn.on{background:#2f6076;color:#fff;border-color:#2f6076;}
+.seg-btn.off{background:#fff;color:#5c6b73;}
+.tbtn{background:#fff;color:#3b4a52;border:1px solid #c7d0d6;border-radius:8px;padding:11px 14px;font-size:13px;font-weight:600;cursor:pointer;}
+.tbtn:hover{background:#f4f7f8;}
+.btn-del{background:transparent;border:none;color:#b9c2c8;font-size:16px;cursor:pointer;padding:8px 4px;border-radius:5px;line-height:1;}
+.btn-del:hover{background:#fbeceb;color:#c0392b;}
+</style>
+</head>
+<body>
+
+<!-- Login screen -->
+<div id="login-screen" style="display:none;position:fixed;inset:0;background:#eef1f3;z-index:100;display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:#fff;border-radius:14px;border:1px solid #dbe1e6;box-shadow:0 4px 24px rgba(20,40,60,.10);width:100%;max-width:360px;padding:36px 32px;">
+    <div style="text-align:center;margin-bottom:28px;">
+      <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#2f6076;font-weight:700;margin-bottom:10px;">Universitetssykehuset Nord-Norge HF</div>
+      <div style="font-size:20px;font-weight:700;color:#16242c;">Farge reagenser</div>
+      <div style="font-size:13px;color:#7c8a91;margin-top:4px;">Registrering av lot &ndash; Klinisk Patologi</div>
+    </div>
+    <label style="display:block;font-size:11px;font-weight:700;color:#3b4a52;margin-bottom:5px;letter-spacing:.06em;text-transform:uppercase;">Brukernavn</label>
+    <input id="login-user" type="text" autocomplete="username" autocapitalize="none" style="width:100%;border:1px solid #c7d0d6;border-radius:8px;padding:11px 13px;font-size:14px;color:#1b2227;outline:none;margin-bottom:14px;" onfocus="this.style.borderColor='#2f6076'" onblur="this.style.borderColor='#c7d0d6'" onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
+    <label style="display:block;font-size:11px;font-weight:700;color:#3b4a52;margin-bottom:5px;letter-spacing:.06em;text-transform:uppercase;">Passord</label>
+    <input id="login-pass" type="password" autocomplete="current-password" style="width:100%;border:1px solid #c7d0d6;border-radius:8px;padding:11px 13px;font-size:14px;color:#1b2227;outline:none;margin-bottom:6px;" onfocus="this.style.borderColor='#2f6076'" onblur="this.style.borderColor='#c7d0d6'" onkeydown="if(event.key==='Enter')doLogin()">
+    <div id="login-err" style="display:none;font-size:12.5px;color:#c0392b;margin-bottom:10px;min-height:18px;"></div>
+    <button onclick="doLogin()" style="width:100%;background:#2f6076;color:#fff;border:none;border-radius:8px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;margin-top:6px;">Logg inn</button>
+  </div>
+</div>
+
+<div id="app" style="display:none;min-height:100vh;padding:28px 22px 64px;">
+  <div id="sheet" style="max-width:1320px;margin:0 auto;background:#fff;border:1px solid #dbe1e6;border-radius:10px;box-shadow:0 1px 3px rgba(20,40,60,.07);overflow:hidden;">
+
+    <!-- Header -->
+    <div style="padding:22px 26px;border-bottom:2px solid #2f6076;background:#f7fafb;">
+      <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#2f6076;font-weight:700;">Universitetssykehuset Nord-Norge HF · Klinisk Patologi</div>
+      <h1 style="margin:7px 0 4px;font-size:24px;font-weight:700;letter-spacing:-.01em;color:#16242c;">Farge reagenser &#8211; registrering av lot</h1>
+      <div style="font-size:12.5px;color:#5c6b73;">Histopatologiske metoder · Fagområde farging</div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="noprint" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:16px 26px;border-bottom:1px solid #e7ecef;">
+      <button class="tbtn" style="color:#2f6076;border-color:#b9c7cf;" onclick="addEmptyRow()">+ Legg til tom rad</button>
+      <div style="width:1px;align-self:stretch;background:#e3e9ec;margin:2px 0;"></div>
+      <div id="sb-bar" style="display:none;align-items:center;gap:8px;">
+        <span id="sb-dot" style="width:9px;height:9px;border-radius:50%;background:#cdd6db;display:inline-block;flex:none;"></span>
+        <span id="sb-label" style="font-size:12.5px;font-weight:600;color:#5c6b73;">Kobler til&#8230;</span>
+        <button class="tbtn" onclick="sbLoad(true)" style="font-size:12px;padding:7px 11px;">&#8635; Last inn p&#229; nytt</button>
+      </div>
+      <div id="file-bar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="font-size:12px;color:#7c8a91;font-weight:600;">Delt fil:</span>
+        <button class="tbtn" onclick="openFromFile()">&#197;pne fra fil</button>
+        <button class="tbtn" onclick="saveToFile()">Lagre til fil</button>
+        <span id="file-indicator" style="display:none;font-size:12px;color:#2f6076;align-items:center;gap:5px;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+          <span style="width:8px;height:8px;border-radius:50%;background:#3a8a5f;display:inline-block;flex:none;"></span>
+          <span id="file-name"></span>
+        </span>
+        <input id="import-input" type="file" accept=".json,application/json" onchange="onImportFile(event)" style="display:none;">
+      </div>
+      <div style="flex:1;"></div>
+      <input id="search-input" type="search" placeholder="S&#248;k navn / lot&#8230;" oninput="onSearch(this.value)" style="border:1px solid #c7d0d6;border-radius:8px;padding:9px 12px;font-size:13px;width:190px;outline:none;background:#fff;color:#1b2227;" onfocus="this.style.borderColor='#2f6076'" onblur="this.style.borderColor='#c7d0d6'">
+      <div id="stats" style="display:flex;gap:14px;align-items:center;font-size:12.5px;color:#5c6b73;margin-right:4px;"></div>
+      <button class="tbtn" onclick="exportCsv()">Eksporter CSV</button>
+      <button class="tbtn" onclick="window.print()">Skriv ut / PDF</button>
+      <button class="tbtn" onclick="doLogout()" style="color:#7c8a91;">Logg ut</button>
+    </div>
+
+    <!-- Print meta -->
+    <div class="printonly" style="padding:8px 26px;font-size:11px;color:#000;">Farge reagenser &#8211; registrering av lot &middot; Utskriftsdato: <span id="printdate"></span></div>
+
+    <!-- Table -->
+    <div class="scroll-x" style="overflow-x:auto;padding:6px 18px 22px;">
+      <table style="width:100%;min-width:1180px;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="text-align:left;">
+            <th style="padding:10px 8px;border-bottom:2px solid #cdd6db;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5c6b73;font-weight:700;width:38px;">#</th>
+            <th style="padding:10px 8px;border-bottom:2px solid #cdd6db;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5c6b73;font-weight:700;min-width:170px;">Navn / reagens</th>
+            <th style="padding:10px 8px;border-bottom:2px solid #cdd6db;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5c6b73;font-weight:700;min-width:150px;">Oppbevaring</th>
+            <th style="padding:10px 8px;border-bottom:2px solid #cdd6db;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5c6b73;font-weight:700;width:104px;">Ventana nr.</th>
+            <th style="padding:10px 8px;border-bottom:2px solid #cdd6db;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5c6b73;font-weight:700;width:120px;">Lotnummer</th>
+            <th style="padding:10px 8px;border-bottom:2px solid #cdd6db;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5c6b73;font-weight:700;width:140px;">Utg&#229;r dato</th>
+            <th style="padding:10px 8px;border-bottom:2px solid #cdd6db;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5c6b73;font-weight:700;min-width:150px;">Mottatt dato og sign.</th>
+            <th style="padding:10px 8px;border-bottom:2px solid #cdd6db;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5c6b73;font-weight:700;min-width:150px;">Tatt i bruk, dato og sign.</th>
+            <th style="padding:10px 8px;border-bottom:2px solid #cdd6db;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#5c6b73;font-weight:700;min-width:160px;">Kommentar</th>
+            <th class="noprint" style="padding:10px 8px;border-bottom:2px solid #cdd6db;width:34px;"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div id="empty" style="display:none;text-align:center;padding:48px 20px 36px;color:#7c8a91;">
+        <div style="font-size:40px;margin-bottom:10px;opacity:.5;">&#8862;</div>
+        <div class="em-msg" style="font-size:15px;font-weight:600;color:#52636b;margin-bottom:5px;">Ingen reagenser registrert enn&#229;</div>
+        <div style="font-size:13px;">Legg til en tom rad for &#229; starte registreringen.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var SKEY = 'fargekit_rows_v1';
+var rows = [];
+var fileName = '';
+var fileHandle = null;
+var hlTimer = null;
+var searchQuery = '';
+var collapsed = new Set();
+
+function today() { return new Date().toISOString().slice(0,10); }
+function genId() { return Date.now()+'-'+Math.random().toString(36).slice(2,7); }
+function h(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function emptyRow(x) {
+  return Object.assign({id:genId(),parentId:null,navn:'',storage:'kjol',ventana:'',lot:'',exp:'',mDato:'',mSign:'',tDato:'',tSign:'',komm:'',_new:false},x||{});
+}
+function persist() {
+  try{localStorage.setItem(SKEY,JSON.stringify(rows.map(function(r){var c=Object.assign({},r);delete c._new;return c;})));}catch(e){}
+}
+function expSt(exp) {
+  if(!exp) return {dot:'#cdd6db',label:'Ingen utløpsdato',tint:''};
+  var d=new Date(exp+'T00:00:00'),now=new Date(today()+'T00:00:00'),diff=(d-now)/86400000;
+  if(isNaN(diff)) return {dot:'#cdd6db',label:'',tint:''};
+  if(diff<0) return {dot:'#c0392b',label:'Utløpt',tint:'#fbeceb'};
+  if(diff<=30) return {dot:'#cd8a00',label:'Utløper snart',tint:'#fdf7e9'};
+  return {dot:'#3a8a5f',label:'Gyldig',tint:''};
+}
+function rowBg(row,i) {
+  if(row._new) return '#e7f4ec';
+  var t=expSt(row.exp).tint;
+  return t||(i%2?'#fbfcfd':'#ffffff');
+}
+
+function renderTable() {
+  var tbody=document.getElementById('tbody');
+  var empty=document.getElementById('empty');
+  var q=searchQuery.toLowerCase();
+  var top=rows.filter(function(r){return !r.parentId;});
+  var visTop=q?top.filter(function(r){
+    var ch=rows.filter(function(c){return c.parentId===r.id;});
+    var pm=(r.navn||'').toLowerCase().includes(q)||(r.lot||'').toLowerCase().includes(q);
+    var cm=ch.some(function(c){return (c.lot||'').toLowerCase().includes(q)||(c.navn||'').toLowerCase().includes(q);});
+    return pm||cm;
+  }):top;
+  if(!visTop.length){
+    tbody.innerHTML='';
+    var emEl=document.getElementById('empty');
+    emEl.style.display='block';
+    emEl.querySelector('.em-msg').textContent=q?'Ingen treff for «'+q+'»':'Ingen reagenser registrert ennå';
+  } else{
+    document.getElementById('empty').style.display='none';
+    var html='';
+    visTop.forEach(function(r,i){
+      var ch=rows.filter(function(c){return c.parentId===r.id;});
+      var isColl=collapsed.has(r.id);
+      html+=rowHtml(r,i,ch.length,isColl);
+      if(!isColl){
+        ch.forEach(function(c,ci){html+=subRowHtml(c,ci);});
+      }
+    });
+    tbody.innerHTML=html;
+  }
+  renderStats();
+}
+function rowHtml(row,i,childCount,isCollapsed) {
+  var st=expSt(row.exp),bg=rowBg(row,i),ch=childCount||0,coll=!!isCollapsed;
+  return '<tr data-id="'+h(row.id)+'" style="background:'+bg+';transition:background .3s;">'
+    +'<td style="padding:9px 8px;border-bottom:1px solid #eef2f4;vertical-align:top;">'
+      +'<div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:6px;">'
+        +'<span style="font-size:12px;color:#8a979e;font-weight:600;">'+(i+1)+'</span>'
+        +(ch?'<button data-collapse="'+h(row.id)+'" style="background:#e3eef3;border:none;border-radius:4px;padding:2px 5px;font-size:10px;color:#2f6076;font-weight:700;cursor:pointer;white-space:nowrap;line-height:1.5;">'+(coll?'&#9654;':'&#9660;')+' '+ch+'</button>':'')
+        +'<span class="dot" title="'+h(st.label)+'" style="width:9px;height:9px;border-radius:50%;display:inline-block;background:'+st.dot+';"></span>'
+      +'</div>'
+    +'</td>'
+    +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f4;vertical-align:top;">'
+      +'<input class="cell-input" type="text" data-f="navn" value="'+h(row.navn)+'" placeholder="f.eks. anti-CD20">'
+    +'</td>'
+    +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f4;vertical-align:top;">'
+      +'<div class="noprint" style="display:flex;gap:5px;padding-top:3px;">'
+        +'<button class="seg-btn '+(row.storage==='kjol'?'on':'off')+'" data-s="kjol">Kjøleskap</button>'
+        +'<button class="seg-btn '+(row.storage==='rom'?'on':'off')+'" data-s="rom">Romtemp.</button>'
+      +'</div>'
+      +'<div class="printonly" style="font-size:11px;">'+(row.storage==='kjol'?'Kjøleskap':'Romtemperatur')+'</div>'
+    +'</td>'
+    +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f4;vertical-align:top;">'
+      +'<input class="cell-input" type="text" data-f="ventana" value="'+h(row.ventana)+'">'
+    +'</td>'
+    +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f4;vertical-align:top;">'
+      +'<input class="cell-input" type="text" data-f="lot" value="'+h(row.lot)+'" style="font-variant-numeric:tabular-nums;">'
+    +'</td>'
+    +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f4;vertical-align:top;">'
+      +'<input class="date-input" type="date" data-f="exp" value="'+h(row.exp)+'">'
+    +'</td>'
+    +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f4;vertical-align:top;">'
+      +'<div style="display:flex;flex-direction:column;gap:4px;">'
+        +'<input class="date-input" type="date" data-f="mDato" value="'+h(row.mDato)+'">'
+        +'<input class="sign-input" type="text" data-f="mSign" value="'+h(row.mSign)+'" placeholder="sign.">'
+      +'</div>'
+    +'</td>'
+    +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f4;vertical-align:top;">'
+      +'<div style="display:flex;flex-direction:column;gap:4px;">'
+        +'<input class="date-input" type="date" data-f="tDato" value="'+h(row.tDato)+'">'
+        +'<input class="sign-input" type="text" data-f="tSign" value="'+h(row.tSign)+'" placeholder="sign.">'
+      +'</div>'
+    +'</td>'
+    +'<td style="padding:5px 6px;border-bottom:1px solid #eef2f4;vertical-align:top;">'
+      +'<input class="cell-input" type="text" data-f="komm" value="'+h(row.komm)+'">'
+    +'</td>'
+    +'<td class="noprint" style="padding:5px 4px;border-bottom:1px solid #eef2f4;vertical-align:top;text-align:center;">'
+      +'<div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:3px;">'
+        +'<button class="btn-del" data-del="1" title="Slett rad">&#10005;</button>'
+        +'<button data-addchild="'+h(row.id)+'" title="Legg til underrad (glass)" style="background:transparent;border:1px solid #b4c7d1;color:#2f6076;font-size:14px;font-weight:700;cursor:pointer;padding:1px 7px;border-radius:5px;line-height:1.5;">+</button>'
+      +'</div>'
+    +'</td>'
+    +'</tr>';
+}
+function subRowHtml(row,ci) {
+  var st=expSt(row.exp);
+  var bg=row._new?'#e7f4ec':(expSt(row.exp).tint||'#f2f8fb');
+  return '<tr data-id="'+h(row.id)+'" data-child="1" style="background:'+bg+';transition:background .3s;">'
+    +'<td style="padding:9px 8px;border-bottom:1px solid #e8f0f4;vertical-align:top;">'
+      +'<div style="display:flex;flex-direction:column;align-items:center;gap:3px;padding-top:5px;">'
+        +'<span style="color:#85afc0;font-size:14px;line-height:1;">&#8627;</span>'
+        +'<span style="font-size:11px;color:#85afc0;font-weight:600;">'+(ci+1)+'</span>'
+        +'<span class="dot" title="'+h(st.label)+'" style="width:8px;height:8px;border-radius:50%;display:inline-block;background:'+st.dot+';"></span>'
+      +'</div>'
+    +'</td>'
+    +'<td colspan="3" style="padding:5px 6px;border-bottom:1px solid #e8f0f4;border-left:3px solid #aacfde;background:#eaf4f8;"></td>'
+    +'<td style="padding:5px 6px;border-bottom:1px solid #e8f0f4;vertical-align:top;">'
+      +'<input class="cell-input" type="text" data-f="lot" value="'+h(row.lot)+'" style="font-variant-numeric:tabular-nums;">'
+    +'</td>'
+    +'<td style="padding:5px 6px;border-bottom:1px solid #e8f0f4;vertical-align:top;">'
+      +'<input class="date-input" type="date" data-f="exp" value="'+h(row.exp)+'">'
+    +'</td>'
+    +'<td style="padding:5px 6px;border-bottom:1px solid #e8f0f4;vertical-align:top;">'
+      +'<div style="display:flex;flex-direction:column;gap:4px;">'
+        +'<input class="date-input" type="date" data-f="mDato" value="'+h(row.mDato)+'">'
+        +'<input class="sign-input" type="text" data-f="mSign" value="'+h(row.mSign)+'" placeholder="sign.">'
+      +'</div>'
+    +'</td>'
+    +'<td style="padding:5px 6px;border-bottom:1px solid #e8f0f4;vertical-align:top;">'
+      +'<div style="display:flex;flex-direction:column;gap:4px;">'
+        +'<input class="date-input" type="date" data-f="tDato" value="'+h(row.tDato)+'">'
+        +'<input class="sign-input" type="text" data-f="tSign" value="'+h(row.tSign)+'" placeholder="sign.">'
+      +'</div>'
+    +'</td>'
+    +'<td style="padding:5px 6px;border-bottom:1px solid #e8f0f4;vertical-align:top;">'
+      +'<input class="cell-input" type="text" data-f="komm" value="'+h(row.komm)+'">'
+    +'</td>'
+    +'<td class="noprint" style="padding:5px 4px;border-bottom:1px solid #e8f0f4;vertical-align:top;text-align:center;padding-top:9px;">'
+      +'<button class="btn-del" data-del="1" title="Slett underrad">&#10005;</button>'
+    +'</td>'
+    +'</tr>';
+}
+function renderStats() {
+  var exp=0,soon=0;
+  rows.forEach(function(r){var l=expSt(r.exp).label;if(l==='Utløpt')exp++;else if(l==='Utløper snart')soon++;});
+  document.getElementById('stats').innerHTML='<span><strong style="color:#1b2227;">'+rows.length+'</strong> rader</span>'
+    +'<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:9px;height:9px;border-radius:50%;background:#cd8a00;display:inline-block;"></span>'+soon+' snart</span>'
+    +'<span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:9px;height:9px;border-radius:50%;background:#c0392b;display:inline-block;"></span>'+exp+' utløpt</span>';
+}
+
+document.getElementById('tbody').addEventListener('input',function(e){
+  var tr=e.target.closest('tr[data-id]');
+  if(!tr)return;
+  var row=rows.find(function(r){return r.id===tr.dataset.id;});
+  if(!row||!e.target.dataset.f)return;
+  row[e.target.dataset.f]=e.target.value;
+  persist();
+  debounceSbUpsert(row);
+  if(e.target.dataset.f==='exp'){
+    var i=rows.indexOf(row),st=expSt(row.exp);
+    tr.style.background=rowBg(row,i);
+    var dot=tr.querySelector('.dot');
+    if(dot){dot.style.background=st.dot;dot.title=st.label;}
+    renderStats();
+  }
+});
+document.getElementById('tbody').addEventListener('click',function(e){
+  var tr=e.target.closest('tr[data-id]');
+  if(!tr)return;
+  var row=rows.find(function(r){return r.id===tr.dataset.id;});
+  if(!row)return;
+  if(e.target.dataset.collapse){
+    var cid=e.target.dataset.collapse;
+    if(collapsed.has(cid))collapsed.delete(cid);else collapsed.add(cid);
+    renderTable();return;
+  }
+  if(e.target.dataset.addchild){
+    addSubRow(e.target.dataset.addchild);
+  } else if(e.target.dataset.s){
+    row.storage=e.target.dataset.s;
+    persist();debounceSbUpsert(row);
+    tr.querySelectorAll('[data-s]').forEach(function(b){b.className='seg-btn '+(b.dataset.s===row.storage?'on':'off');});
+    var pt=tr.querySelector('.printonly');
+    if(pt)pt.textContent=row.storage==='kjol'?'Kj\xf8leskap':'Romtemperatur';
+  } else if(e.target.dataset.del){
+    var children=rows.filter(function(c){return c.parentId===row.id;});
+    if(children.length&&!confirm('Slett denne raden og '+children.length+' underrad'+(children.length>1?'er':'')+'?'))return;
+    var toDelete=[row.id].concat(children.map(function(c){return c.id;}));
+    toDelete.forEach(function(did){sbDelete(did);});
+    rows=rows.filter(function(r){return toDelete.indexOf(r.id)<0;});
+    persist();renderTable();
+  }
+});
+
+function addEmptyRow(){addRow({},false);}
+function addSubRow(parentId){collapsed.delete(parentId);addRow({parentId:parentId,mDato:today()},true);}
+function addRow(extra,highlight){
+  var row=emptyRow(Object.assign({_new:!!highlight},extra||{}));
+  rows.push(row);
+  persist();sbUpsert(row);
+  renderTable();
+  if(highlight){
+    clearTimeout(hlTimer);
+    hlTimer=setTimeout(function(){
+      row._new=false;
+      var tr=document.querySelector('tr[data-id="'+row.id+'"]');
+      if(tr){
+        if(row.parentId){tr.style.background=expSt(row.exp).tint||'#f2f8fb';}
+        else{tr.style.background=rowBg(row,rows.filter(function(r){return !r.parentId;}).indexOf(row));}
+      }
+    },3500);
+  }
+}
+
+// Shared file
+function buildJson(){
+  var c=rows.map(function(r){var x=Object.assign({},r);delete x._new;return x;});
+  return JSON.stringify({app:'farge-reagenser',savedAt:new Date().toISOString(),rows:c},null,2);
+}
+function loadJson(txt,name){
+  var data;try{data=JSON.parse(txt);}catch(e){alert('Fant ikke gyldig data i filen.');return;}
+  var r=Array.isArray(data)?data:(data&&Array.isArray(data.rows)?data.rows:null);
+  if(!r){alert('Filen inneholder ingen reagensliste.');return;}
+  if(rows.length>0&&!confirm('Dette erstatter den lokale listen. Fortsette?'))return;
+  rows=r.map(function(x){var o={parentId:x.parentId||null,navn:x.navn||'',storage:x.storage==='rom'?'rom':'kjol',ventana:x.ventana||'',lot:x.lot||'',exp:x.exp||'',mDato:x.mDato||'',mSign:x.mSign||'',tDato:x.tDato||'',tSign:x.tSign||'',komm:x.komm||''};if(x.id)o.id=x.id;return emptyRow(o);});
+  persist();fileName=name||fileName;updateFileInd();renderTable();
+}
+async function saveToFile(){
+  var json=buildJson();
+  try{
+    if(fileHandle&&fileHandle.createWritable){var w=await fileHandle.createWritable();await w.write(json);await w.close();return;}
+    if(window.showSaveFilePicker){
+      var hh=await window.showSaveFilePicker({suggestedName:'farge-reagenser.json',types:[{description:'JSON',accept:{'application/json':['.json']}}]});
+      fileHandle=hh;var w2=await hh.createWritable();await w2.write(json);await w2.close();
+      fileName=hh.name;updateFileInd();return;
+    }
+  }catch(e){if(e&&e.name==='AbortError')return;}
+  var blob=new Blob([json],{type:'application/json'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='farge-reagenser.json';a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+}
+async function openFromFile(){
+  try{
+    if(window.showOpenFilePicker){
+      var res=await window.showOpenFilePicker({types:[{description:'JSON',accept:{'application/json':['.json']}}]});
+      var hh=res[0];fileHandle=hh;var f=await hh.getFile();loadJson(await f.text(),hh.name);return;
+    }
+  }catch(e){if(e&&e.name==='AbortError')return;}
+  document.getElementById('import-input').click();
+}
+function onImportFile(e){
+  var f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;
+  var fr=new FileReader();fr.onload=function(){loadJson(fr.result,f.name);};fr.readAsText(f);
+}
+function updateFileInd(){
+  var el=document.getElementById('file-indicator'),nm=document.getElementById('file-name');
+  if(fileName){nm.textContent=fileName;el.style.display='inline-flex';}else{el.style.display='none';}
+}
+
+// CSV
+function exportCsv(){
+  var head=['Navn/reagens','Oppbevaring','Ventana nr.','Lotnummer','Utgår dato','Mottatt dato','Mottatt sign.','Tatt i bruk dato','Tatt i bruk sign.','Kommentar'];
+  var e2=function(v){return'"'+String(v==null?'':v).replace(/"/g,'""')+'"';};
+  var lines=[head.map(e2).join(';')];
+  rows.forEach(function(r){lines.push([r.navn,r.storage==='kjol'?'Kjøleskap':'Romtemperatur',r.ventana,r.lot,r.exp,r.mDato,r.mSign,r.tDato,r.tSign,r.komm].map(e2).join(';'));});
+  var blob=new Blob(['﻿'+lines.join('\r\n')],{type:'text/csv;charset=utf-8;'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='fargekit-'+today()+'.csv';a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+}
+
+function onSearch(v){searchQuery=v.trim();renderTable();}
+function autoCollapse(){
+  rows.forEach(function(r){
+    if(!r.parentId&&rows.some(function(c){return c.parentId===r.id;}))collapsed.add(r.id);
+  });
+}
+
+// ── Supabase-konfigurasjon ───────────────────────────────────────────────────
+// Lim inn dine verdier fra supabase.com → Project Settings → API
+var SB_URL = '';   // eks: 'https://xxxxxxxxxxxx.supabase.co'
+var SB_KEY = '';   // eks: 'eyJhbGciOiJIUzI1NiIs...'
+// ────────────────────────────────────────────────────────────────────────────
+
+var sbSyncTimer={};
+function sbCreds(){return{url:SB_URL.trim().replace(/\/$/,''),key:SB_KEY.trim()};}
+function sbActive(){var c=sbCreds();return !!(c.url&&c.key);}
+function sbHdr(){var c=sbCreds();return{'apikey':c.key,'Authorization':'Bearer '+c.key,'Content-Type':'application/json','Prefer':'return=representation'};}
+
+function setSbStatus(state,msg){
+  var dot=document.getElementById('sb-dot'),lbl=document.getElementById('sb-label');
+  if(!dot)return;
+  var colors={ok:'#3a8a5f',error:'#c0392b',syncing:'#cd8a00',idle:'#cdd6db'};
+  dot.style.background=colors[state]||colors.idle;
+  lbl.textContent=msg||'';
+  lbl.style.color=state==='error'?'#c0392b':state==='ok'?'#2a7a52':'#5c6b73';
+}
+
+async function sbLoad(showAlert){
+  if(!sbActive())return;
+  setSbStatus('syncing','Laster inn&#8230;');
+  var c=sbCreds();
+  try{
+    var r=await fetch(c.url+'/rest/v1/reagenser?select=*&order=updated_at.asc',{headers:sbHdr()});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    var data=await r.json();
+    rows=data.map(function(x){return emptyRow({id:x.id,parentId:x.parent_id||null,navn:x.navn||'',storage:x.storage==='rom'?'rom':'kjol',ventana:x.ventana||'',lot:x.lot||'',exp:x.exp||'',mDato:x.mDato||'',mSign:x.mSign||'',tDato:x.tDato||'',tSign:x.tSign||'',komm:x.komm||''});});
+    persist();autoCollapse();renderTable();
+    setSbStatus('ok','Synkronisert');
+    if(showAlert)setSbStatus('ok','Oppdatert ('+rows.length+' rader)');
+  }catch(e){
+    setSbStatus('error','Tilkoblingsfeil');
+    if(showAlert)alert('Kunne ikke laste fra Supabase: '+(e.message||e));
+  }
+}
+
+async function sbUpsert(row){
+  if(!sbActive())return;
+  var c=sbCreds(),body=JSON.stringify([{id:row.id,parent_id:row.parentId||null,navn:row.navn,storage:row.storage,ventana:row.ventana,lot:row.lot,exp:row.exp,mDato:row.mDato,mSign:row.mSign,tDato:row.tDato,tSign:row.tSign,komm:row.komm,updated_at:new Date().toISOString()}]);
+  setSbStatus('syncing','Lagrer&#8230;');
+  try{
+    var r=await fetch(c.url+'/rest/v1/reagenser',{method:'POST',headers:Object.assign({},sbHdr(),{'Prefer':'resolution=merge-duplicates,return=minimal'}),body:body});
+    if(!r.ok){var et=await r.text().catch(function(){return'';});console.error('sbUpsert HTTP '+r.status,et);throw new Error('HTTP '+r.status+(et?' – '+et.slice(0,120):''));}
+    setSbStatus('ok','Synkronisert');
+  }catch(e){console.error('sbUpsert feil:',e);setSbStatus('error','Lagringsfeil ('+e.message+')');}
+}
+
+async function sbDelete(id){
+  if(!sbActive())return;
+  var c=sbCreds();
+  setSbStatus('syncing','Sletter&#8230;');
+  try{
+    var r=await fetch(c.url+'/rest/v1/reagenser?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:sbHdr()});
+    if(!r.ok){var et=await r.text().catch(function(){return'';});throw new Error('HTTP '+r.status+(et?' – '+et.slice(0,120):''));}
+    setSbStatus('ok','Synkronisert');
+  }catch(e){console.error('sbDelete feil:',e);setSbStatus('error','Lagringsfeil ('+e.message+')');}
+}
+
+function debounceSbUpsert(row){
+  clearTimeout(sbSyncTimer[row.id]);
+  sbSyncTimer[row.id]=setTimeout(function(){sbUpsert(row);},800);
+}
+
+function updateSbBar(){
+  var active=sbActive();
+  document.getElementById('sb-bar').style.display=active?'flex':'none';
+  document.getElementById('file-bar').style.display=active?'none':'flex';
+}
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+var AUTH_USER='hist', AUTH_PASS='lab', AUTH_KEY='fk_auth';
+function doLogin(){
+  var u=document.getElementById('login-user').value.trim();
+  var p=document.getElementById('login-pass').value;
+  var err=document.getElementById('login-err');
+  if(u===AUTH_USER&&p===AUTH_PASS){
+    localStorage.setItem(AUTH_KEY,'1');
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='block';
+    bootApp();
+  }else{
+    err.textContent='Feil brukernavn eller passord.';
+    err.style.display='block';
+    document.getElementById('login-pass').value='';
+    document.getElementById('login-pass').focus();
+  }
+}
+function doLogout(){
+  localStorage.removeItem(AUTH_KEY);
+  location.reload();
+}
+
+// ── Init ────────────────────────────────────────────────────────────────────
+function bootApp(){
+  document.getElementById('printdate').textContent=today();
+  try{var raw=localStorage.getItem(SKEY);rows=raw?JSON.parse(raw):[];if(!Array.isArray(rows))rows=[];}catch(e){rows=[];}
+  autoCollapse();renderTable();
+  updateSbBar();
+  if(sbActive())sbLoad(false);else{document.getElementById('sb-bar').style.display='none';document.getElementById('file-bar').style.display='flex';}
+}
+if(localStorage.getItem(AUTH_KEY)==='1'){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='block';
+  bootApp();
+}else{
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('app').style.display='none';
+}
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load',function(){navigator.serviceWorker.register('./sw.js');});
+}
+</script>
+</body>
+</html>
