@@ -1,0 +1,20 @@
+{
+  "name": "Reagenser UNN",
+  "short_name": "Reagenser UNN",
+  "description": "Reagens registreringer – UNN Klinisk Patologi",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#eef1f3",
+  "theme_color": "#2f6076",
+  "lang": "nb",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
