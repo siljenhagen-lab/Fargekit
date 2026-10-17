@@ -3,7 +3,6 @@ const CACHE = 'fargekit-v1';
 const APP_SHELL = [
   './',
   './index.html',
-  './project/support.js',
   './manifest.json',
   './icon.svg',
 ];
@@ -19,7 +18,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k.startsWith('fargekit-') && k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
